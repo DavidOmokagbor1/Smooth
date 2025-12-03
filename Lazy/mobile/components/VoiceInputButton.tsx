@@ -147,8 +147,9 @@ export function VoiceInputButton({
       
       // Clean up on error
       try {
-        if (recording) {
-          await recording.stopAndUnloadAsync();
+        const currentRecording = recording;
+        if (currentRecording) {
+          await currentRecording.stopAndUnloadAsync();
         }
       } catch (cleanupErr) {
         // Ignore cleanup errors

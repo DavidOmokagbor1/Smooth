@@ -2,7 +2,7 @@
 Task CRUD API endpoints
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import datetime
@@ -90,11 +90,11 @@ async def get_task(
 @router.patch("/tasks/{task_id}", response_model=TaskSchema)
 async def update_task(
     task_id: str,
-    title: Optional[str] = None,
-    description: Optional[str] = None,
-    priority: Optional[str] = None,
-    status: Optional[str] = None,
-    reminder_time: Optional[datetime] = None,
+    title: Optional[str] = Body(None),
+    description: Optional[str] = Body(None),
+    priority: Optional[str] = Body(None),
+    status: Optional[str] = Body(None),
+    reminder_time: Optional[str] = Body(None),  # Accept as ISO string, convert to datetime
     db: AsyncSession = Depends(get_db),
 ):
     """Update a task with comprehensive error handling"""
@@ -163,6 +163,28 @@ async def update_task(
                     status_code=400,
                     detail=f"Invalid status value: {status}"
                 )
+        
+        if reminder_time is not None:
+            # Parse ISO string to datetime
+            try:
+                # Handle ISO format with or without timezone
+                if reminder_time.endswith('Z'):
+                    reminder_time = reminder_time[:-1] + '+00:00'
+                reminder_dt = datetime.fromisoformat(reminder_time)
+            except (ValueError, AttributeError) as e:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid reminder_time format. Use ISO 8601 format (e.g., '2024-12-02T15:00:00Z'). Error: {str(e)}"
+                )
+            
+            # Ensure reminder_time is in UTC for database storage
+            from datetime import timezone
+            if reminder_dt.tzinfo is None:
+                # Assume local time, convert to UTC
+                reminder_dt = reminder_dt.replace(tzinfo=timezone.utc)
+            elif reminder_dt.tzinfo != timezone.utc:
+                reminder_dt = reminder_dt.astimezone(timezone.utc)
+            update_data["reminder_time"] = reminder_dt
         
         # Check if there are any fields to update
         if not update_data:

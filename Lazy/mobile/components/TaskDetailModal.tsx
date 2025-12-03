@@ -4,7 +4,7 @@
  * Includes reminder functionality and AI insights
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -96,6 +96,16 @@ export function TaskDetailModal({
       }
 
       // Schedule notification
+      // Calculate seconds until reminder
+      const now = new Date();
+      const secondsUntilReminder = Math.max(0, Math.floor((reminderTime.getTime() - now.getTime()) / 1000));
+      
+      if (secondsUntilReminder <= 0) {
+        Alert.alert('Invalid Time', 'Reminder time must be in the future.');
+        return;
+      }
+      
+      // Use Date object directly as trigger (expo-notifications accepts Date)
       await Notifications.scheduleNotificationAsync({
         content: {
           title: `Reminder: ${task.title}`,

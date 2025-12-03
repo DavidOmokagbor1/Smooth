@@ -220,3 +220,69 @@ export async function updateTask(
   }
 }
 
+/**
+ * Proactive Suggestion types
+ */
+export interface ProactiveSuggestion {
+  id: string;
+  suggestion_type: string;
+  title: string;
+  message: string;
+  suggested_action?: string;
+  reasoning?: string;
+  confidence: number;
+  created_at: string;
+}
+
+/**
+ * Get proactive suggestions (Siri-like intelligence)
+ */
+export async function getProactiveSuggestions(
+  generateNew: boolean = true
+): Promise<ProactiveSuggestion[]> {
+  try {
+    console.log('🧠 Fetching proactive suggestions...');
+    const response = await axios.get<ProactiveSuggestion[]>(
+      API_ENDPOINTS.PROACTIVE_SUGGESTIONS,
+      {
+        params: { generate_new: generateNew },
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+        },
+        timeout: 15000,
+      }
+    );
+    console.log(`✅ Retrieved ${response.data.length} proactive suggestions`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching proactive suggestions:', error);
+    // Don't throw - return empty array so app continues working
+    return [];
+  }
+}
+
+/**
+ * Mark a proactive suggestion as shown, dismissed, or acted upon
+ */
+export async function markSuggestionShown(
+  suggestionId: string,
+  action: 'shown' | 'dismissed' | 'acted_on' = 'shown'
+): Promise<void> {
+  try {
+    await axios.post(
+      API_ENDPOINTS.MARK_SUGGESTION_SHOWN(suggestionId),
+      {},
+      {
+        params: { action },
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+        },
+      }
+    );
+    console.log(`✅ Marked suggestion ${suggestionId} as ${action}`);
+  } catch (error: any) {
+    console.error('Error marking suggestion:', error);
+    // Don't throw - this is not critical
+  }
+}
+

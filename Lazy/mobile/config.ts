@@ -49,6 +49,8 @@ export const API_ENDPOINTS = {
   TASK: (id: string) => `${API_BASE_URL}/api/v1/tasks/${id}`,
   TASK_COMPLETE: (id: string) => `${API_BASE_URL}/api/v1/tasks/${id}/complete`,
   TASK_DELETE: (id: string) => `${API_BASE_URL}/api/v1/tasks/${id}`,
+  PROACTIVE_SUGGESTIONS: `${API_BASE_URL}/api/v1/proactive-suggestions`,
+  MARK_SUGGESTION_SHOWN: (id: string) => `${API_BASE_URL}/api/v1/proactive-suggestions/${id}/mark-shown`,
 };
 
 // Helper to check if we're on a real device

@@ -30,7 +30,10 @@ export function VoiceInputButton({
   const recordingStartTime = useRef<number | null>(null);
   const isStartingRecording = useRef<boolean>(false);
   const shouldStopRef = useRef<boolean>(false);
-  const minRecordingDuration = 500; // Minimum 500ms to prevent accidental stops
+  const minRecordingDuration = 1000; // Minimum 1 second to prevent accidental stops
+  const maxRecordingDuration = 60000; // Maximum 60 seconds (1 minute) to prevent accidental long recordings
+  const [recordingDuration, setRecordingDuration] = useState<number>(0);
+  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     requestPermissions();
@@ -39,6 +42,12 @@ export function VoiceInputButton({
   // Cleanup recording on unmount
   useEffect(() => {
     return () => {
+      // Clear duration interval
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+      // Stop recording if active
       if (recording) {
         recording.stopAndUnloadAsync().catch(() => {});
       }
@@ -99,7 +108,22 @@ export function VoiceInputButton({
       setIsRecording(true);
       recordingStartTime.current = Date.now();
       isStartingRecording.current = false;
+      setRecordingDuration(0);
       console.log('✅ Recording started successfully');
+
+      // Start duration tracking
+      durationIntervalRef.current = setInterval(() => {
+        if (recordingStartTime.current) {
+          const elapsed = Date.now() - recordingStartTime.current;
+          setRecordingDuration(elapsed);
+          
+          // Auto-stop at max duration
+          if (elapsed >= maxRecordingDuration) {
+            console.log('⏱️ Maximum recording duration reached, stopping...');
+            stopRecording();
+          }
+        }
+      }, 100); // Update every 100ms
 
       // If stop was requested while starting, stop now
       if (shouldStopRef.current) {
@@ -157,9 +181,16 @@ export function VoiceInputButton({
     }
 
     try {
+      // Clear duration interval
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+      
       setIsRecording(false);
       recordingStartTime.current = null;
       shouldStopRef.current = false;
+      setRecordingDuration(0);
       
       // Get URI before stopping
       const uri = recording.getURI();
@@ -182,11 +213,17 @@ export function VoiceInputButton({
       }
     } catch (err: any) {
       console.error('Failed to stop recording', err);
+      // Clear duration interval on error
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
       // Reset state even on error
       setRecording(null);
       setIsRecording(false);
       recordingStartTime.current = null;
       shouldStopRef.current = false;
+      setRecordingDuration(0);
     }
   }
 
@@ -218,6 +255,8 @@ export function VoiceInputButton({
         ]}
         onPressIn={startRecording}
         onPressOut={stopRecording}
+        onLongPress={undefined} // Prevent long press from interfering
+        delayLongPress={10000} // Very long delay to prevent conflicts
         disabled={!hasPermission || isProcessing}
       >
         {isRecording ? (
@@ -237,8 +276,15 @@ export function VoiceInputButton({
         )}
       </Pressable>
       <Text style={styles.instructionText}>
-        {isRecording ? 'Release to stop recording' : 'Press & hold to speak'}
+        {isRecording 
+          ? `Recording... ${Math.floor(recordingDuration / 1000)}s` 
+          : 'Press & hold to speak'}
       </Text>
+      {isRecording && recordingDuration >= maxRecordingDuration - 2000 && (
+        <Text style={styles.warningText}>
+          Maximum duration reached
+        </Text>
+      )}
       {!hasPermission && (
         <Text style={styles.permissionText}>
           Microphone permission required
@@ -307,6 +353,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 12,
     color: '#F87171',
+    fontWeight: '500',
+  },
+  warningText: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#F59E0B',
     fontWeight: '500',
   },
 });

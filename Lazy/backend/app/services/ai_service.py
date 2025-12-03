@@ -247,36 +247,71 @@ class AIService:
         transcript: str
     ) -> EmotionalState:
         """
-        Detect emotional state from voice using Hume AI or similar.
-        Currently returns mock emotional state.
+        Intelligently detect emotional state from transcript using advanced keyword analysis.
+        TODO: Integrate Hume AI or similar emotion detection API for voice analysis.
         """
-        # TODO: Integrate Hume AI or similar emotion detection API
-        # For now, analyze transcript keywords to simulate emotion detection
-        
         transcript_lower = transcript.lower()
         
-        # Simple keyword-based emotion detection (mock)
-        if any(word in transcript_lower for word in ["stressed", "worried", "anxious", "overwhelmed"]):
-            return EmotionalState(
-                primary_emotion="stressed",
-                energy_level=0.3,
-                stress_level=0.8,
-                confidence=0.85
-            )
-        elif any(word in transcript_lower for word in ["tired", "exhausted", "drained"]):
-            return EmotionalState(
-                primary_emotion="tired",
-                energy_level=0.2,
-                stress_level=0.4,
-                confidence=0.80
-            )
+        # Advanced keyword-based emotion detection with intensity scoring
+        stress_keywords = {
+            "overwhelmed": 0.9, "stressed": 0.8, "anxious": 0.85, "worried": 0.75,
+            "panicked": 0.95, "freaking out": 0.9, "can't handle": 0.85, "too much": 0.8,
+            "deadline": 0.7, "urgent": 0.65, "behind": 0.7, "late": 0.65
+        }
+        
+        energy_keywords = {
+            "tired": -0.4, "exhausted": -0.5, "drained": -0.45, "worn out": -0.4,
+            "energetic": 0.3, "ready": 0.2, "motivated": 0.25, "excited": 0.3,
+            "can't focus": -0.3, "brain fog": -0.35, "sluggish": -0.3
+        }
+        
+        # Calculate stress level
+        stress_score = 0.3  # Base neutral
+        stress_count = 0
+        for keyword, weight in stress_keywords.items():
+            if keyword in transcript_lower:
+                stress_score = max(stress_score, weight)
+                stress_count += 1
+        
+        # Multiple stress indicators increase stress level
+        if stress_count > 1:
+            stress_score = min(0.95, stress_score + (stress_count - 1) * 0.1)
+        
+        # Calculate energy level
+        energy_score = 0.6  # Base moderate
+        energy_modifiers = []
+        for keyword, modifier in energy_keywords.items():
+            if keyword in transcript_lower:
+                energy_modifiers.append(modifier)
+        
+        if energy_modifiers:
+            # Average energy modifiers
+            energy_adjustment = sum(energy_modifiers) / len(energy_modifiers)
+            energy_score = max(0.1, min(1.0, energy_score + energy_adjustment))
+        
+        # Determine primary emotion
+        if stress_score > 0.75:
+            primary_emotion = "stressed"
+        elif stress_score > 0.5:
+            primary_emotion = "anxious"
+        elif energy_score < 0.3:
+            primary_emotion = "tired"
+        elif energy_score > 0.7:
+            primary_emotion = "energetic"
         else:
-            return EmotionalState(
-                primary_emotion="neutral",
-                energy_level=0.6,
-                stress_level=0.3,
-                confidence=0.70
-            )
+            primary_emotion = "neutral"
+        
+        # Confidence based on keyword matches
+        confidence = 0.7
+        if stress_count > 0 or len(energy_modifiers) > 0:
+            confidence = min(0.95, 0.7 + (stress_count + len(energy_modifiers)) * 0.05)
+        
+        return EmotionalState(
+            primary_emotion=primary_emotion,
+            energy_level=round(energy_score, 2),
+            stress_level=round(stress_score, 2),
+            confidence=round(confidence, 2)
+        )
     
     async def _extract_tasks(
         self,
@@ -308,33 +343,84 @@ class AIService:
         """Extract tasks using GPT-4o with structured output"""
         import uuid
         
-        system_prompt = """You are an AI assistant helping someone with executive function challenges (ADHD, autism, burnout, etc.). 
-Your job is to extract tasks from their spoken input and intelligently prioritize them based on:
-1. Urgency indicators in the text
-2. The user's current emotional state (stressed, tired, etc.)
-3. Task complexity and estimated duration
+        system_prompt = """You are an intelligent AI assistant helping someone with executive function challenges (ADHD, autism, burnout, etc.). 
+Your job is to extract tasks from their spoken input and intelligently prioritize them with deep understanding of context.
 
-Return a JSON array of tasks. Each task should have:
-- title: Clear, actionable task description
-- priority: "critical", "high", "medium", or "low" based on urgency and user's emotional state
+INTELLIGENT PRIORITIZATION RULES:
+1. **Urgency Detection**: Look for time-sensitive keywords:
+   - "today", "now", "asap", "urgent", "deadline", "due today" → CRITICAL
+   - "tomorrow", "this week", "soon" → HIGH
+   - "later", "eventually", "when I can" → MEDIUM or LOW
+
+2. **Time Context**: Extract specific times mentioned:
+   - "3pm meeting", "appointment at 2", "deadline Friday" → Use for prioritization
+   - Morning tasks for low energy users → Lower priority if energy < 0.4
+
+3. **Emotional State Awareness**:
+   - Stressed (stress > 0.7) + Low Energy (< 0.4): Focus on 1-2 critical tasks only, break complex tasks down
+   - Moderate stress/energy: Normal prioritization
+   - High energy: Can handle more tasks, suggest batching similar tasks
+
+4. **Task Complexity Analysis**:
+   - Simple tasks (5-15 min): Good for low energy states
+   - Complex tasks (30+ min): Break down or defer if user is overwhelmed
+   - Multi-step tasks: Identify and suggest breaking into smaller steps
+
+5. **Context Clues**:
+   - Location mentions → Extract and categorize as "errand" or "appointment"
+   - People mentioned → May indicate social/relationship tasks
+   - Work-related keywords → Categorize as "work"
+   - Health/medical keywords → High priority, categorize as "appointment" or "errand"
+
+6. **Smart Categorization**:
+   - "errand": Shopping, picking up items, going somewhere
+   - "appointment": Scheduled meetings, doctor visits, time-specific events
+   - "work": Job-related tasks, emails, meetings, deadlines
+   - "personal": Self-care, hobbies, home tasks
+   - "other": Everything else
+
+Return a JSON object with a "tasks" key containing an array. Each task must have:
+- title: Clear, actionable, specific task description (not vague)
+- priority: "critical", "high", "medium", or "low" (be thoughtful about this)
 - category_type: "errand", "appointment", "work", "personal", or "other"
-- location: If applicable (e.g., "CVS Pharmacy", "Doctor's office")
-- estimated_duration_minutes: Realistic time estimate
-- original_text: The exact phrase from the transcript
+- location: Specific location if mentioned (e.g., "CVS Pharmacy on Main St", "Doctor's office")
+- estimated_duration_minutes: Realistic estimate based on task type and complexity
+- original_text: The exact phrase from transcript that led to this task
 
-Be empathetic - if the user is stressed (stress_level > 0.7) and low energy (energy_level < 0.4), 
-prioritize fewer, simpler tasks. Don't overwhelm them."""
+BE EMPATHETIC: If user is overwhelmed, extract fewer tasks and prioritize only what truly matters. Break down complex tasks into simpler steps."""
 
-        user_prompt = f"""Extract and prioritize tasks from this transcript:
+        user_prompt = f"""Extract and intelligently prioritize tasks from this transcript:
 
+TRANSCRIPT:
 "{transcript}"
 
-User's emotional state:
+USER'S CURRENT STATE:
 - Primary emotion: {emotional_state.primary_emotion}
-- Energy level: {emotional_state.energy_level:.1f} (0.0 = exhausted, 1.0 = energetic)
-- Stress level: {emotional_state.stress_level:.1f} (0.0 = calm, 1.0 = highly stressed)
+- Energy level: {emotional_state.energy_level:.1f}/1.0 (0.0 = completely exhausted, 1.0 = fully energetic)
+- Stress level: {emotional_state.stress_level:.1f}/1.0 (0.0 = completely calm, 1.0 = highly stressed/overwhelmed)
 
-Return a JSON object with a "tasks" key containing an array of task objects. Each task object must have: title, priority, category_type, location (optional), estimated_duration_minutes, original_text."""
+CONTEXT ANALYSIS REQUIRED:
+1. Identify ALL tasks mentioned (even if implied)
+2. Extract time references (today, tomorrow, specific times, deadlines)
+3. Identify urgency indicators
+4. Consider user's emotional state when prioritizing
+5. Break down complex tasks if user is overwhelmed
+6. Extract locations mentioned
+7. Estimate realistic durations
+
+SPECIAL INSTRUCTIONS:
+- If stress > 0.7 AND energy < 0.4: Extract maximum 3-4 tasks, prioritize only critical/high
+- If stress < 0.5 AND energy > 0.6: Can extract more tasks, normal prioritization
+- Always extract specific times mentioned and use them for prioritization
+- If a task seems complex, consider if it should be broken down (but don't break down unless truly needed)
+
+Return a JSON object with a "tasks" key containing an array. Each task object must have:
+- title: Clear, specific, actionable description
+- priority: "critical", "high", "medium", or "low" (be thoughtful)
+- category_type: "errand", "appointment", "work", "personal", or "other"
+- location: Specific location if mentioned, null otherwise
+- estimated_duration_minutes: Realistic estimate (5-15 for simple, 15-30 for medium, 30-60+ for complex)
+- original_text: The exact phrase from transcript"""
 
         try:
             response = self.openai_client.chat.completions.create(
@@ -344,7 +430,8 @@ Return a JSON object with a "tasks" key containing an array of task objects. Eac
                     {"role": "user", "content": user_prompt}
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.3,  # Lower temperature for more consistent, structured output
+                temperature=0.4,  # Slightly higher for more intelligent, context-aware responses
+                max_tokens=2000,  # Allow more tokens for detailed task extraction
             )
             
             # Parse the response
@@ -484,24 +571,37 @@ Return a JSON object with a "tasks" key containing an array of task objects. Eac
             for task in tasks[:5]
         ])
         
-        system_prompt = """You are "Lazy", an AI companion for people with executive function challenges (ADHD, autism, burnout, etc.).
-Your role is to be supportive, empathetic, and reduce cognitive load - NOT to be a productivity coach.
+        system_prompt = """You are "Lazy", an intelligent, empathetic AI companion for people with executive function challenges (ADHD, autism, burnout, etc.).
+Your role is to be supportive, reduce cognitive load, and help users feel understood - NOT to be a productivity coach.
 
-Key principles:
-1. Be gentle and understanding - never judgmental
-2. Reduce overwhelm by focusing on ONE thing at a time when user is stressed
-3. Acknowledge their emotional state
-4. Make suggestions feel like a caring friend, not a taskmaster
-5. Adjust your tone based on their emotional state:
-   - Stressed + Low Energy: Very gentle, suggest just ONE simple task
-   - Moderate: Supportive and encouraging
-   - Energetic: Can be slightly more enthusiastic
+CORE PRINCIPLES:
+1. **Empathy First**: Always acknowledge their emotional state and validate their feelings
+2. **Reduce Overwhelm**: When stressed/overwhelmed, focus on ONE simple, achievable task
+3. **Energy Awareness**: Match your suggestions to their energy level
+4. **No Judgment**: Never make them feel bad about what they haven't done
+5. **Smart Suggestions**: Recommend tasks that:
+   - Match their current energy level
+   - Can be completed in their available time
+   - Will give them a sense of accomplishment
+   - Are actually important (not just urgent)
+
+TONE ADJUSTMENT:
+- **Stressed (stress > 0.7) + Low Energy (< 0.4)**: Very gentle, calm, suggest ONE simple task (5-15 min max)
+- **Moderate Stress/Energy**: Supportive, encouraging, can suggest 1-2 tasks
+- **Low Stress + High Energy (> 0.6)**: Slightly more enthusiastic, can suggest batching or multiple tasks
+- **High Stress + High Energy**: Calm but supportive, help them channel energy productively
+
+INTELLIGENT SUGGESTIONS:
+- If they have many tasks: Suggest starting with the easiest win (quick task that feels good to complete)
+- If they have complex tasks: Suggest breaking it down or starting with just one step
+- If they have time-sensitive tasks: Acknowledge urgency but don't add pressure
+- If they have no critical tasks: Celebrate that and suggest self-care or rest
 
 Return a JSON object with:
-- message: Your supportive message (1-2 sentences, empathetic)
-- suggested_action: ONE specific task to focus on (or null if no specific action)
-- reasoning: Brief explanation of why this suggestion (for transparency)
-- tone: "gentle", "supportive", "energetic", or "calm"
+- message: Your supportive, empathetic message (2-3 sentences max, personalized to their state)
+- suggested_action: ONE specific task title to focus on (or null if rest/self-care is better)
+- reasoning: Brief, transparent explanation of why this suggestion (helps build trust)
+- tone: "gentle", "supportive", "energetic", or "calm" (match their emotional state)
 """
 
         user_prompt = f"""Generate a supportive companion message for this user:

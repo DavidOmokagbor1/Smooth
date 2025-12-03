@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Alert, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Task } from '../types';
 
@@ -54,62 +54,67 @@ export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCa
 
   return (
     <View style={styles.cardContainer}>
-      <View style={styles.card}>
-        {/* Main clickable area */}
-        <TouchableOpacity
-          style={styles.cardContent}
-          onPress={() => onPress?.(task)}
-          activeOpacity={0.95}
-        >
-          {/* Priority Indicator Dot */}
-          <View style={[styles.priorityDot, { backgroundColor: priority.color }]} />
-          
-          <View style={styles.content}>
-            {/* Title */}
-            <Text style={styles.title} numberOfLines={2}>
-              {task.title}
-            </Text>
-            
-            {/* Metadata Row */}
-            <View style={styles.metadataRow}>
-              {/* Location */}
-              {task.category?.location && (
-                <View style={styles.metadataItem}>
-                  <Ionicons name="location-outline" size={13} color="#94A3B8" />
-                  <Text style={styles.metadataText} numberOfLines={1}>
-                    {task.category.location}
-                  </Text>
-                </View>
-              )}
-              
-              {/* Duration */}
-              {task.category?.estimated_duration_minutes && (
-                <View style={styles.metadataItem}>
-                  <Ionicons name="time-outline" size={13} color="#94A3B8" />
-                  <Text style={styles.metadataText}>
-                    {task.category.estimated_duration_minutes}m
-                  </Text>
-                </View>
-              )}
-            </View>
-            
-            {/* Priority Badge */}
-            <View style={[styles.priorityBadge, { backgroundColor: priority.bgColor }]}>
-              <Ionicons name={priority.icon as any} size={12} color={priority.color} />
-              <Text style={[styles.priorityText, { color: priority.color }]}>
-                {priority.label}
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+      <Pressable
+        style={({ pressed }) => [
+          styles.card,
+          pressed && styles.cardPressed
+        ]}
+        onPress={() => {
+          console.log('TaskCard pressed:', task.id);
+          onPress?.(task);
+        }}
+      >
+        {/* Priority Indicator Dot */}
+        <View style={[styles.priorityDot, { backgroundColor: priority.color }]} pointerEvents="none" />
         
-        {/* Action Buttons - Separate from card press */}
+        <View style={styles.content} pointerEvents="box-none">
+          {/* Title */}
+          <Text style={styles.title} numberOfLines={2} pointerEvents="none">
+            {task.title}
+          </Text>
+          
+          {/* Metadata Row */}
+          <View style={styles.metadataRow} pointerEvents="none">
+            {/* Location */}
+            {task.category?.location && (
+              <View style={styles.metadataItem}>
+                <Ionicons name="location-outline" size={13} color="#94A3B8" />
+                <Text style={styles.metadataText} numberOfLines={1}>
+                  {task.category.location}
+                </Text>
+              </View>
+            )}
+            
+            {/* Duration */}
+            {task.category?.estimated_duration_minutes && (
+              <View style={styles.metadataItem}>
+                <Ionicons name="time-outline" size={13} color="#94A3B8" />
+                <Text style={styles.metadataText}>
+                  {task.category.estimated_duration_minutes}m
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          {/* Priority Badge */}
+          <View style={[styles.priorityBadge, { backgroundColor: priority.bgColor }]} pointerEvents="none">
+            <Ionicons name={priority.icon as any} size={12} color={priority.color} />
+            <Text style={[styles.priorityText, { color: priority.color }]}>
+              {priority.label}
+            </Text>
+          </View>
+        </View>
+        
+        {/* Action Buttons - Positioned absolutely to not interfere with card press */}
         <View style={styles.actions}>
           {/* Complete Checkbox */}
           <TouchableOpacity
             style={styles.completeButton}
-            onPress={() => onComplete?.(task.id)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => {
+              console.log('Complete button pressed');
+              onComplete?.(task.id);
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <View style={[styles.checkbox, { borderColor: priority.color + '40' }]}>
               <View style={[styles.checkboxInner, { backgroundColor: priority.color + '20' }]} />
@@ -122,6 +127,7 @@ export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCa
               <TouchableOpacity
                 style={styles.quickActionButton}
                 onPress={() => {
+                  console.log('Edit button pressed');
                   Alert.prompt(
                     'Edit Task',
                     'Enter new task title:',
@@ -140,7 +146,7 @@ export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCa
                     task.title
                   );
                 }}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons name="pencil" size={16} color="#64748B" />
               </TouchableOpacity>
@@ -149,16 +155,17 @@ export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCa
               <TouchableOpacity
                 style={styles.quickActionButton}
                 onPress={() => {
+                  console.log('Delete button pressed');
                   onDelete?.(task.id);
                 }}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons name="trash-outline" size={16} color="#EF4444" />
               </TouchableOpacity>
             )}
           </View>
         </View>
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -181,11 +188,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     overflow: 'hidden',
+    position: 'relative',
   },
-  cardContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+  cardPressed: {
+    opacity: 0.8,
+    backgroundColor: '#1F2937',
   },
   priorityDot: {
     width: 4,
@@ -243,6 +250,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingTop: 2,
+    marginLeft: 12,
+    zIndex: 10,
   },
   completeButton: {
     marginBottom: 4,

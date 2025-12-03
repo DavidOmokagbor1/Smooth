@@ -31,6 +31,8 @@ import { CelebrationModal } from './components/CelebrationModal';
 import { ProgressDashboard } from './components/ProgressDashboard';
 import { AchievementSystem } from './components/AchievementSystem';
 import { MoodTracker } from './components/MoodTracker';
+import { DailySummary } from './components/DailySummary';
+import { PredictiveCard } from './components/PredictiveCard';
 
 import { Personality, Task, VoiceProcessingResponse, CompanionSuggestion } from './types';
 import { processVoiceInput, processTextInput, getTasks, completeTask, deleteTask, updateTask } from './services/api';
@@ -53,6 +55,8 @@ export default function App() {
   const [totalCompleted, setTotalCompleted] = useState(0);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showMoodTracker, setShowMoodTracker] = useState(false);
+  const [showDailySummary, setShowDailySummary] = useState(false);
+  const [achievementsUnlocked, setAchievementsUnlocked] = useState(0);
 
   // Check if user has seen onboarding
   useEffect(() => {
@@ -305,6 +309,18 @@ export default function App() {
                 emotionalState={emotionalState}
               />
             )}
+
+            {/* Predictive Card - Smart suggestions */}
+            {tasks.length > 0 && (
+              <PredictiveCard
+                tasks={tasks}
+                completedToday={completedToday}
+                onSuggestionPress={(suggestion) => {
+                  // Handle suggestion - could filter tasks or show specific view
+                  console.log('Suggestion pressed:', suggestion);
+                }}
+              />
+            )}
           </View>
 
           {/* Tasks Section */}
@@ -318,6 +334,12 @@ export default function App() {
               </View>
               <View style={styles.headerRight}>
                 <Text style={styles.taskCount}>{tasks.length} total</Text>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => setShowDailySummary(true)}
+                >
+                  <Ionicons name="calendar" size={20} color="#3B82F6" />
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.iconButton}
                   onPress={() => setShowMoodTracker(true)}
@@ -489,6 +511,32 @@ export default function App() {
             <MoodTracker
               currentMood={emotionalState}
               onClose={() => setShowMoodTracker(false)}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Daily Summary Modal */}
+      {showDailySummary && (
+        <View style={styles.progressModalOverlay}>
+          <TouchableOpacity
+            style={styles.progressModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowDailySummary(false)}
+          />
+          <View style={styles.progressModalContent}>
+            <DailySummary
+              tasks={tasks}
+              completedToday={completedToday}
+              streakDays={streakDays}
+              totalCompleted={totalCompleted}
+              personality={personality}
+              achievementsUnlocked={achievementsUnlocked}
+              onClose={() => setShowDailySummary(false)}
+              onShare={() => {
+                // Share functionality - could use expo-sharing
+                Alert.alert('Share', 'Share your daily progress!');
+              }}
             />
           </View>
         </View>

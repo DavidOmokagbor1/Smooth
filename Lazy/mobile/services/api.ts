@@ -196,6 +196,7 @@ export async function updateTask(
     description?: string;
     priority?: string;
     status?: string;
+    reminder_time?: string;
   }
 ): Promise<Task> {
   try {
@@ -283,6 +284,66 @@ export async function markSuggestionShown(
   } catch (error: any) {
     console.error('Error marking suggestion:', error);
     // Don't throw - this is not critical
+  }
+}
+
+/**
+ * Route Planning types
+ */
+export interface RouteStop {
+  task_id: string;
+  title: string;
+  location?: string;
+  coordinates?: [number, number];
+  distance_from_previous_km: number;
+  estimated_duration_minutes: number;
+  priority: string;
+}
+
+export interface RoutePlan {
+  optimized: boolean;
+  route: RouteStop[];
+  total_distance_km: number;
+  estimated_time_minutes: number;
+  task_count: number;
+  message: string;
+  formatted_route?: string;
+}
+
+/**
+ * Plan an optimized route for errands
+ */
+export async function planRoute(
+  taskIds?: string[],
+  categoryFilter?: string,
+  startLocation?: { lat: number; lng: number }
+): Promise<RoutePlan> {
+  try {
+    console.log('🗺️ Planning route for errands...');
+    const response = await axios.post<RoutePlan>(
+      API_ENDPOINTS.PLAN_ROUTE,
+      {
+        task_ids: taskIds,
+        category_filter: categoryFilter,
+        start_location: startLocation,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        timeout: 15000,
+      }
+    );
+    console.log(`✅ Route planned: ${response.data.task_count} stops, ${response.data.total_distance_km} km`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error planning route:', error);
+    throw new Error(
+      error.response?.data?.detail ||
+      error.message ||
+      'Failed to plan route'
+    );
   }
 }
 

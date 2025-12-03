@@ -94,6 +94,7 @@ async def update_task(
     description: Optional[str] = None,
     priority: Optional[str] = None,
     status: Optional[str] = None,
+    reminder_time: Optional[datetime] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """Update a task with comprehensive error handling"""

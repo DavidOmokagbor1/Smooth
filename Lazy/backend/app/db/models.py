@@ -67,6 +67,7 @@ class Task(Base):
     due_date = Column(DateTime, nullable=True, index=True)
     suggested_time = Column(DateTime, nullable=True)  # AI-suggested time to do it
     estimated_duration_minutes = Column(Integer, nullable=True)
+    reminder_time = Column(DateTime, nullable=True, index=True)  # When to remind user about this task
     
     # Status tracking
     status = Column(SQLEnum(TaskStatus), nullable=False, default=TaskStatus.PENDING, index=True)

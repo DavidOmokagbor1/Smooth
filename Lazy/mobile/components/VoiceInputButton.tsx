@@ -258,6 +258,15 @@ export function VoiceInputButton({
     );
   }
 
+  // Toggle recording on tap
+  const handleToggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Pressable
@@ -265,10 +274,7 @@ export function VoiceInputButton({
           styles.buttonWrapper,
           pressed && styles.buttonPressed
         ]}
-        onPressIn={startRecording}
-        onPressOut={stopRecording}
-        onLongPress={undefined} // Prevent long press from interfering
-        delayLongPress={10000} // Very long delay to prevent conflicts
+        onPress={handleToggleRecording}
         disabled={!hasPermission || isProcessing}
       >
         {isRecording ? (
@@ -280,6 +286,10 @@ export function VoiceInputButton({
           >
             <View style={styles.pulseRing} />
             <Ionicons name="mic" size={52} color="#FFFFFF" />
+            {/* Duration display on button */}
+            <View style={styles.durationBadge}>
+              <Text style={styles.durationText}>{formatDuration(recordingDuration)}</Text>
+            </View>
           </LinearGradient>
         ) : (
           <View style={[styles.button, styles.buttonIdle]}>
@@ -289,8 +299,8 @@ export function VoiceInputButton({
       </Pressable>
       <Text style={styles.instructionText}>
         {isRecording 
-          ? `Recording... ${formatDuration(recordingDuration)}` 
-          : 'Press & hold to speak'}
+          ? `Tap again to stop • ${formatDuration(recordingDuration)}` 
+          : 'Tap to start recording'}
       </Text>
       {isRecording && recordingDuration >= maxRecordingDuration - 10000 && (
         <Text style={styles.warningText}>
@@ -384,6 +394,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#F59E0B',
     fontWeight: '500',
+  },
+  durationBadge: {
+    position: 'absolute',
+    bottom: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  durationText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
 

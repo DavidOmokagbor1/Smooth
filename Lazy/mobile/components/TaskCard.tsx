@@ -13,9 +13,10 @@ interface TaskCardProps {
   onComplete?: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
   onEdit?: (taskId: string, updates: { title?: string; priority?: string }) => void;
+  onPress?: (task: Task) => void;
 }
 
-export function TaskCard({ task, onComplete, onDelete, onEdit }: TaskCardProps) {
+export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCardProps) {
   const getPriorityConfig = (priority: string) => {
     switch (priority) {
       case 'critical':
@@ -55,7 +56,7 @@ export function TaskCard({ task, onComplete, onDelete, onEdit }: TaskCardProps) 
     <View style={styles.cardContainer}>
       <TouchableOpacity
         style={styles.card}
-        onPress={() => onComplete?.(task.id)}
+        onPress={() => onPress?.(task)}
         activeOpacity={0.95}
       >
         {/* Priority Indicator Dot */}
@@ -117,8 +118,7 @@ export function TaskCard({ task, onComplete, onDelete, onEdit }: TaskCardProps) 
             {onEdit && (
               <TouchableOpacity
                 style={styles.quickActionButton}
-                onPress={(e) => {
-                  e.stopPropagation();
+                onPress={() => {
                   Alert.prompt(
                     'Edit Task',
                     'Enter new task title:',
@@ -145,8 +145,7 @@ export function TaskCard({ task, onComplete, onDelete, onEdit }: TaskCardProps) 
             {onDelete && (
               <TouchableOpacity
                 style={styles.quickActionButton}
-                onPress={(e) => {
-                  e.stopPropagation();
+                onPress={() => {
                   onDelete?.(task.id);
                 }}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}

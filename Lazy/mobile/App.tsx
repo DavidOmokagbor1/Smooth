@@ -34,9 +34,11 @@ import { AchievementSystem } from './components/AchievementSystem';
 import { MoodTracker } from './components/MoodTracker';
 import { DailySummary } from './components/DailySummary';
 import { PredictiveCard } from './components/PredictiveCard';
+import { RoutePlanModal } from './components/RoutePlanModal';
+import { TaskDetailModal } from './components/TaskDetailModal';
 
 import { Personality, Task, VoiceProcessingResponse, CompanionSuggestion } from './types';
-import { processVoiceInput, processTextInput, getTasks, completeTask, deleteTask, updateTask } from './services/api';
+import { processVoiceInput, processTextInput, getTasks, completeTask, deleteTask, updateTask, planRoute, RoutePlan } from './services/api';
 
 export default function App() {
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean>(false);
@@ -59,6 +61,11 @@ export default function App() {
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [achievementsUnlocked, setAchievementsUnlocked] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [showRoutePlan, setShowRoutePlan] = useState(false);
+  const [routePlan, setRoutePlan] = useState<RoutePlan | null>(null);
+  const [isPlanningRoute, setIsPlanningRoute] = useState(false);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Check if user has seen onboarding
   useEffect(() => {
@@ -228,6 +235,43 @@ export default function App() {
     }
   }, []);
 
+  const handlePlanRoute = useCallback(async () => {
+    try {
+      setIsPlanningRoute(true);
+      
+      // Get tasks with locations (errands/appointments)
+      const locationTasks = tasks.filter(
+        (t) => t.category?.location && 
+        (t.category.type === 'errand' || t.category.type === 'appointment')
+      );
+      
+      if (locationTasks.length < 2) {
+        Alert.alert(
+          'Not Enough Locations',
+          'You need at least 2 tasks with locations to plan a route.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      // Plan route
+      const taskIds = locationTasks.map((t) => t.id);
+      const route = await planRoute(taskIds, 'errand');
+      
+      setRoutePlan(route);
+      setShowRoutePlan(true);
+    } catch (error: any) {
+      console.error('Error planning route:', error);
+      Alert.alert(
+        'Route Planning Error',
+        error.message || 'Failed to plan route. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsPlanningRoute(false);
+    }
+  }, [tasks]);
+
   // Categorize tasks
   const doNowTasks = tasks.filter(
     (t) => t.priority === 'critical' || t.priority === 'high'
@@ -309,9 +353,12 @@ export default function App() {
               <PredictiveCard
                 tasks={tasks}
                 completedToday={completedToday}
-                onSuggestionPress={(suggestion) => {
-                  // Handle suggestion - could filter tasks or show specific view
-                  console.log('Suggestion pressed:', suggestion);
+                onSuggestionPress={async (suggestion) => {
+                  if (suggestion === 'Plan your route for errands') {
+                    await handlePlanRoute();
+                  } else {
+                    console.log('Suggestion pressed:', suggestion);
+                  }
                 }}
               />
             )}
@@ -364,6 +411,10 @@ export default function App() {
                 onTaskComplete={handleTaskComplete}
                 onTaskDelete={handleTaskDelete}
                 onTaskUpdate={handleTaskUpdate}
+                onTaskPress={(task) => {
+                  setSelectedTask(task);
+                  setShowTaskDetail(true);
+                }}
               />
             )}
 
@@ -476,7 +527,28 @@ export default function App() {
         </View>
       )}
 
-      {/* Settings Modal */}
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        visible={showTaskDetail}
+        task={selectedTask}
+        onClose={() => {
+          setShowTaskDetail(false);
+          setSelectedTask(null);
+        }}
+        onComplete={handleTaskComplete}
+        onDelete={handleTaskDelete}
+        onUpdate={handleTaskUpdate}
+        onSetReminder={async (taskId, reminderTime) => {
+          // Update task with reminder time
+          await handleTaskUpdate(taskId, { reminder_time: reminderTime.toISOString() });
+        }}
+      />
+      {/* Route Plan Modal */}
+      <RoutePlanModal
+        visible={showRoutePlan}
+        routePlan={routePlan}
+        onClose={() => setShowRoutePlan(false)}
+      />
       <SettingsModal
         visible={showSettings}
         onClose={() => setShowSettings(false)}

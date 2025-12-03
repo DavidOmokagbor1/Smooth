@@ -16,6 +16,7 @@ interface TaskColumnsProps {
   onTaskComplete?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
   onTaskUpdate?: (taskId: string, updates: { title?: string; priority?: string }) => void;
+  onTaskPress?: (task: Task) => void;
 }
 
 export function TaskColumns({
@@ -25,6 +26,7 @@ export function TaskColumns({
   onTaskComplete,
   onTaskDelete,
   onTaskUpdate,
+  onTaskPress,
 }: TaskColumnsProps) {
   const renderColumn = (
     title: string,
@@ -58,6 +60,7 @@ export function TaskColumns({
               onComplete={onTaskComplete}
               onDelete={onTaskDelete}
               onEdit={onTaskUpdate}
+              onPress={onTaskPress}
             />
           ))
         ) : (

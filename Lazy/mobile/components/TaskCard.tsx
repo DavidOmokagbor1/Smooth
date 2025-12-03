@@ -54,53 +54,56 @@ export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCa
 
   return (
     <View style={styles.cardContainer}>
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => onPress?.(task)}
-        activeOpacity={0.95}
-      >
-        {/* Priority Indicator Dot */}
-        <View style={[styles.priorityDot, { backgroundColor: priority.color }]} />
-        
-        <View style={styles.content}>
-          {/* Title */}
-          <Text style={styles.title} numberOfLines={2}>
-            {task.title}
-          </Text>
+      <View style={styles.card}>
+        {/* Main clickable area */}
+        <TouchableOpacity
+          style={styles.cardContent}
+          onPress={() => onPress?.(task)}
+          activeOpacity={0.95}
+        >
+          {/* Priority Indicator Dot */}
+          <View style={[styles.priorityDot, { backgroundColor: priority.color }]} />
           
-          {/* Metadata Row */}
-          <View style={styles.metadataRow}>
-            {/* Location */}
-            {task.category?.location && (
-              <View style={styles.metadataItem}>
-                <Ionicons name="location-outline" size={13} color="#94A3B8" />
-                <Text style={styles.metadataText} numberOfLines={1}>
-                  {task.category.location}
-                </Text>
-              </View>
-            )}
-            
-            {/* Duration */}
-            {task.category?.estimated_duration_minutes && (
-              <View style={styles.metadataItem}>
-                <Ionicons name="time-outline" size={13} color="#94A3B8" />
-                <Text style={styles.metadataText}>
-                  {task.category.estimated_duration_minutes}m
-                </Text>
-              </View>
-            )}
-          </View>
-          
-          {/* Priority Badge */}
-          <View style={[styles.priorityBadge, { backgroundColor: priority.bgColor }]}>
-            <Ionicons name={priority.icon as any} size={12} color={priority.color} />
-            <Text style={[styles.priorityText, { color: priority.color }]}>
-              {priority.label}
+          <View style={styles.content}>
+            {/* Title */}
+            <Text style={styles.title} numberOfLines={2}>
+              {task.title}
             </Text>
+            
+            {/* Metadata Row */}
+            <View style={styles.metadataRow}>
+              {/* Location */}
+              {task.category?.location && (
+                <View style={styles.metadataItem}>
+                  <Ionicons name="location-outline" size={13} color="#94A3B8" />
+                  <Text style={styles.metadataText} numberOfLines={1}>
+                    {task.category.location}
+                  </Text>
+                </View>
+              )}
+              
+              {/* Duration */}
+              {task.category?.estimated_duration_minutes && (
+                <View style={styles.metadataItem}>
+                  <Ionicons name="time-outline" size={13} color="#94A3B8" />
+                  <Text style={styles.metadataText}>
+                    {task.category.estimated_duration_minutes}m
+                  </Text>
+                </View>
+              )}
+            </View>
+            
+            {/* Priority Badge */}
+            <View style={[styles.priorityBadge, { backgroundColor: priority.bgColor }]}>
+              <Ionicons name={priority.icon as any} size={12} color={priority.color} />
+              <Text style={[styles.priorityText, { color: priority.color }]}>
+                {priority.label}
+              </Text>
+            </View>
           </View>
-        </View>
+        </TouchableOpacity>
         
-        {/* Action Buttons */}
+        {/* Action Buttons - Separate from card press */}
         <View style={styles.actions}>
           {/* Complete Checkbox */}
           <TouchableOpacity
@@ -155,7 +158,7 @@ export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCa
             )}
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -178,6 +181,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     overflow: 'hidden',
+  },
+  cardContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   priorityDot: {
     width: 4,

@@ -61,8 +61,23 @@ export function TaskDetailModal({
   // Update reminder state when task changes
   useEffect(() => {
     if (task?.reminder_time) {
-      setReminderTime(new Date(task.reminder_time));
-      setReminderEnabled(true);
+      try {
+        // Validate and parse the date string
+        const date = new Date(task.reminder_time);
+        if (isNaN(date.getTime())) {
+          // Invalid date string
+          console.warn('Invalid reminder_time format:', task.reminder_time);
+          setReminderTime(null);
+          setReminderEnabled(false);
+        } else {
+          setReminderTime(date);
+          setReminderEnabled(true);
+        }
+      } catch (error) {
+        console.error('Error parsing reminder_time:', error);
+        setReminderTime(null);
+        setReminderEnabled(false);
+      }
     } else {
       setReminderTime(null);
       setReminderEnabled(false);

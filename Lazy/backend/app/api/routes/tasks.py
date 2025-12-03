@@ -11,7 +11,7 @@ import logging
 from app.db.database import get_db
 from app.db.repositories import TaskRepository
 from app.db.models import Task, TaskStatus, TaskPriority
-from app.models.schemas import Task as TaskSchema, TaskPriority as TaskPrioritySchema, TaskCategory
+from app.models.schemas import Task as TaskSchema, TaskPriority as TaskPrioritySchema, TaskCategory, UpdateTaskRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -90,11 +90,7 @@ async def get_task(
 @router.patch("/tasks/{task_id}", response_model=TaskSchema)
 async def update_task(
     task_id: str,
-    title: Optional[str] = Body(None),
-    description: Optional[str] = Body(None),
-    priority: Optional[str] = Body(None),
-    status: Optional[str] = Body(None),
-    reminder_time: Optional[str] = Body(None),  # Accept as ISO string, convert to datetime
+    update_request: UpdateTaskRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """Update a task with comprehensive error handling"""
@@ -112,6 +108,13 @@ async def update_task(
         
         # Build update data with validation
         update_data = {}
+        
+        # Extract fields from request model
+        title = update_request.title
+        description = update_request.description
+        priority = update_request.priority
+        status = update_request.status
+        reminder_time = update_request.reminder_time
         
         if title is not None:
             title_trimmed = title.strip() if title else ""
@@ -277,10 +280,11 @@ async def complete_task(
 
 def _task_to_schema(task: Task) -> TaskSchema:
     """Convert database Task model to Pydantic schema"""
+    # Safely access fields that may not exist in older database records
     return TaskSchema(
         id=task.id,
         title=task.title,
-        description=task.description,
+        description=getattr(task, 'description', None),
         priority=TaskPrioritySchema(task.priority.value),
         category=TaskCategory(
             type=task.category_type or "personal",
@@ -289,8 +293,8 @@ def _task_to_schema(task: Task) -> TaskSchema:
         ),
         original_text=task.original_text or task.title,
         suggested_time=task.suggested_time,
-        due_date=task.due_date,
-        reminder_time=task.reminder_time,
+        due_date=getattr(task, 'due_date', None),
+        reminder_time=getattr(task, 'reminder_time', None),
         status=task.status.value if task.status else "pending",
         location_coordinates=task.location_coordinates,
     )

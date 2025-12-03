@@ -77,6 +77,24 @@ class Task(BaseModel):
         }
 
 
+class UpdateTaskRequest(BaseModel):
+    """Request model for updating a task"""
+    title: Optional[str] = Field(None, description="Task title/description", max_length=500)
+    description: Optional[str] = Field(None, description="Task description/details", max_length=2000)
+    priority: Optional[str] = Field(None, description="Task priority (critical, high, medium, low)")
+    status: Optional[str] = Field(None, description="Task status (pending, in_progress, completed, cancelled)")
+    reminder_time: Optional[str] = Field(None, description="Reminder time as ISO 8601 datetime string (e.g., '2024-12-02T15:00:00Z')")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "Updated task title",
+                "priority": "high",
+                "reminder_time": "2024-12-02T15:00:00Z"
+            }
+        }
+
+
 # ==================== Companion Response Models ====================
 
 class CompanionSuggestion(BaseModel):

@@ -224,7 +224,7 @@ export default function App() {
 
   const handleTaskUpdate = useCallback(async (
     taskId: string,
-    updates: { title?: string; description?: string; priority?: string }
+    updates: { title?: string; description?: string; priority?: string; reminder_time?: string }
   ) => {
     try {
       await updateTask(taskId, updates);

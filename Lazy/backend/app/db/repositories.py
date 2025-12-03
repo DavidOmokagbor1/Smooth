@@ -9,7 +9,10 @@ from typing import List, Optional
 from datetime import datetime
 import uuid
 
-from app.db.models import Task, TaskStatus, TaskPriority, EmotionalStateRecord
+from app.db.models import (
+    Task, TaskStatus, TaskPriority, EmotionalStateRecord,
+    ConversationHistory, UserBehaviorPattern, ProactiveSuggestion
+)
 
 
 class TaskRepository:
@@ -174,4 +177,223 @@ class EmotionalStateRepository:
         await db.commit()
         await db.refresh(record)
         return record
+
+
+class ConversationHistoryRepository:
+    """Repository for conversation history"""
+    
+    @staticmethod
+    async def create(
+        db: AsyncSession,
+        user_input: str,
+        user_id: Optional[str] = None,
+        ai_response: Optional[str] = None,
+        transcript: Optional[str] = None,
+        emotional_state: Optional[dict] = None,
+        extracted_tasks: Optional[list] = None,
+        session_id: Optional[str] = None,
+        reasoning_context: Optional[dict] = None,
+        follow_up_needed: Optional[str] = None,
+    ) -> ConversationHistory:
+        """Create a new conversation history record"""
+        record_id = f"conv_{uuid.uuid4().hex[:12]}"
+        
+        record = ConversationHistory(
+            id=record_id,
+            user_id=user_id,
+            user_input=user_input,
+            ai_response=ai_response,
+            transcript=transcript,
+            emotional_state=emotional_state,
+            extracted_tasks=extracted_tasks,
+            session_id=session_id or record_id,
+            reasoning_context=reasoning_context,
+            follow_up_needed=follow_up_needed,
+        )
+        
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+        return record
+    
+    @staticmethod
+    async def get_recent(
+        db: AsyncSession,
+        user_id: Optional[str] = None,
+        limit: int = 10,
+        session_id: Optional[str] = None,
+    ) -> List[ConversationHistory]:
+        """Get recent conversation history for context"""
+        query = select(ConversationHistory)
+        
+        if user_id:
+            query = query.where(ConversationHistory.user_id == user_id)
+        if session_id:
+            query = query.where(ConversationHistory.session_id == session_id)
+        
+        query = query.order_by(ConversationHistory.created_at.desc()).limit(limit)
+        
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+
+class UserBehaviorPatternRepository:
+    """Repository for user behavior patterns"""
+    
+    @staticmethod
+    async def create_or_update(
+        db: AsyncSession,
+        pattern_type: str,
+        pattern_key: str,
+        pattern_value: dict,
+        user_id: Optional[str] = None,
+        confidence: float = 0.5,
+        time_of_day: Optional[str] = None,
+        day_of_week: Optional[str] = None,
+    ) -> UserBehaviorPattern:
+        """Create or update a behavior pattern"""
+        # Check if pattern exists
+        query = select(UserBehaviorPattern).where(
+            UserBehaviorPattern.pattern_type == pattern_type,
+            UserBehaviorPattern.pattern_key == pattern_key,
+        )
+        if user_id:
+            query = query.where(UserBehaviorPattern.user_id == user_id)
+        
+        result = await db.execute(query)
+        existing = result.scalar_one_or_none()
+        
+        if existing:
+            # Update existing pattern
+            existing.pattern_value = pattern_value
+            existing.confidence = min(1.0, existing.confidence + 0.1)  # Increase confidence
+            existing.frequency += 1
+            existing.last_observed = datetime.utcnow()
+            if time_of_day:
+                existing.time_of_day = time_of_day
+            if day_of_week:
+                existing.day_of_week = day_of_week
+            await db.commit()
+            await db.refresh(existing)
+            return existing
+        else:
+            # Create new pattern
+            pattern_id = f"pattern_{uuid.uuid4().hex[:12]}"
+            pattern = UserBehaviorPattern(
+                id=pattern_id,
+                user_id=user_id,
+                pattern_type=pattern_type,
+                pattern_key=pattern_key,
+                pattern_value=pattern_value,
+                confidence=confidence,
+                frequency=1,
+                time_of_day=time_of_day,
+                day_of_week=day_of_week,
+            )
+            db.add(pattern)
+            await db.commit()
+            await db.refresh(pattern)
+            return pattern
+    
+    @staticmethod
+    async def get_patterns(
+        db: AsyncSession,
+        user_id: Optional[str] = None,
+        pattern_type: Optional[str] = None,
+        min_confidence: float = 0.3,
+    ) -> List[UserBehaviorPattern]:
+        """Get behavior patterns matching criteria"""
+        query = select(UserBehaviorPattern).where(
+            UserBehaviorPattern.confidence >= min_confidence
+        )
+        
+        if user_id:
+            query = query.where(UserBehaviorPattern.user_id == user_id)
+        if pattern_type:
+            query = query.where(UserBehaviorPattern.pattern_type == pattern_type)
+        
+        query = query.order_by(UserBehaviorPattern.confidence.desc())
+        
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+
+class ProactiveSuggestionRepository:
+    """Repository for proactive suggestions"""
+    
+    @staticmethod
+    async def create(
+        db: AsyncSession,
+        suggestion_type: str,
+        title: str,
+        message: str,
+        user_id: Optional[str] = None,
+        suggested_action: Optional[str] = None,
+        reasoning: Optional[str] = None,
+        related_tasks: Optional[list] = None,
+        confidence: float = 0.5,
+        expires_at: Optional[datetime] = None,
+    ) -> ProactiveSuggestion:
+        """Create a new proactive suggestion"""
+        suggestion_id = f"suggestion_{uuid.uuid4().hex[:12]}"
+        
+        suggestion = ProactiveSuggestion(
+            id=suggestion_id,
+            user_id=user_id,
+            suggestion_type=suggestion_type,
+            title=title,
+            message=message,
+            suggested_action=suggested_action,
+            reasoning=reasoning,
+            related_tasks=related_tasks,
+            confidence=confidence,
+            expires_at=expires_at,
+        )
+        
+        db.add(suggestion)
+        await db.commit()
+        await db.refresh(suggestion)
+        return suggestion
+    
+    @staticmethod
+    async def get_active(
+        db: AsyncSession,
+        user_id: Optional[str] = None,
+        limit: int = 5,
+    ) -> List[ProactiveSuggestion]:
+        """Get active (unshown, not expired) suggestions"""
+        from datetime import datetime
+        query = select(ProactiveSuggestion).where(
+            ProactiveSuggestion.shown == "false"
+        ).where(
+            (ProactiveSuggestion.expires_at.is_(None)) |
+            (ProactiveSuggestion.expires_at > datetime.utcnow())
+        )
+        
+        if user_id:
+            query = query.where(ProactiveSuggestion.user_id == user_id)
+        
+        query = query.order_by(ProactiveSuggestion.confidence.desc(), ProactiveSuggestion.created_at.desc()).limit(limit)
+        
+        result = await db.execute(query)
+        return list(result.scalars().all())
+    
+    @staticmethod
+    async def mark_shown(
+        db: AsyncSession,
+        suggestion_id: str,
+        action: str = "shown",  # "shown", "dismissed", "acted_on"
+    ) -> Optional[ProactiveSuggestion]:
+        """Mark a suggestion as shown"""
+        query = select(ProactiveSuggestion).where(ProactiveSuggestion.id == suggestion_id)
+        result = await db.execute(query)
+        suggestion = result.scalar_one_or_none()
+        
+        if suggestion:
+            suggestion.shown = action
+            suggestion.shown_at = datetime.utcnow()
+            await db.commit()
+            await db.refresh(suggestion)
+        
+        return suggestion
 

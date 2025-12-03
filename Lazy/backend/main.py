@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from app.api.routes import process_voice, process_text, tasks
+from app.api.routes import process_voice, process_text, tasks, proactive
 from app.core.config import settings
 from app.db.database import init_db, close_db
 
@@ -31,6 +31,7 @@ app.add_middleware(
 app.include_router(process_voice.router, prefix="/api/v1", tags=["voice"])
 app.include_router(process_text.router, prefix="/api/v1", tags=["text"])
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
+app.include_router(proactive.router, prefix="/api/v1", tags=["proactive"])
 
 
 @app.on_event("startup")

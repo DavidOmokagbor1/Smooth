@@ -9,8 +9,12 @@ import logging
 
 from app.models.schemas import VoiceProcessingResponse
 from app.services.ai_service import AIService
+from app.services.context_service import ContextService
 from app.db.database import get_db
-from app.db.repositories import TaskRepository, EmotionalStateRepository
+from app.db.repositories import (
+    TaskRepository, EmotionalStateRepository,
+    ConversationHistoryRepository
+)
 from app.db.models import TaskPriority, EnergyCost
 
 logger = logging.getLogger(__name__)
@@ -48,15 +52,39 @@ async def process_voice_input(
         audio_data = await audio_file.read()
         logger.info(f"Received audio file: {audio_file.filename}, size: {len(audio_data)} bytes")
         
-        # Process through AI service
-        response = await ai_service.process_voice_input(audio_data, audio_file.content_type)
+        # Build context for Siri-like reasoning
+        context_service = ContextService()
+        context = None
+        user_id = None  # TODO: Get from auth when implemented
+        session_id = None  # TODO: Get from request headers or generate
         
-        # Save emotional state record
+        if db:
+            try:
+                context = await context_service.build_context(
+                    db=db,
+                    user_id=user_id,
+                    session_id=session_id,
+                    limit_recent=5,
+                )
+                logger.debug("Built context for voice processing")
+            except Exception as e:
+                logger.warning(f"Failed to build context: {e}", exc_info=True)
+                # Continue without context rather than failing
+        
+        # Process through AI service with context
+        response = await ai_service.process_voice_input(
+            audio_data, 
+            audio_file.content_type,
+            context=context
+        )
+        
+        # Save conversation history and emotional state
         if db:
             try:
                 # Truncate transcript if too long for database
                 transcript_text = response.transcript[:1000] if len(response.transcript) > 1000 else response.transcript
                 
+                # Save emotional state
                 await EmotionalStateRepository.create(
                     db=db,
                     primary_emotion=response.emotional_state.primary_emotion,
@@ -67,9 +95,41 @@ async def process_voice_input(
                     task_count=len(response.tasks),
                 )
                 logger.debug(f"Saved emotional state record: {response.emotional_state.primary_emotion}")
+                
+                # Save conversation history for context
+                await ConversationHistoryRepository.create(
+                    db=db,
+                    user_id=user_id,
+                    user_input=transcript_text,
+                    ai_response=response.companion_suggestion.message if response.companion_suggestion else None,
+                    transcript=transcript_text,
+                    emotional_state={
+                        "primary_emotion": response.emotional_state.primary_emotion,
+                        "energy_level": response.emotional_state.energy_level,
+                        "stress_level": response.emotional_state.stress_level,
+                    },
+                    extracted_tasks=[{"title": t.title, "priority": t.priority.value} for t in response.tasks],
+                    session_id=session_id,
+                )
+                logger.debug("Saved conversation history")
+                
+                # Learn patterns from this interaction
+                await context_service.learn_patterns(
+                    db=db,
+                    user_id=user_id,
+                    transcript=transcript_text,
+                    tasks=[{"category_type": t.category.type if t.category else None} for t in response.tasks],
+                    emotional_state={
+                        "energy_level": response.emotional_state.energy_level,
+                        "stress_level": response.emotional_state.stress_level,
+                    },
+                    time_context=context.get("time_context") if context else None,
+                )
+                logger.debug("Learned patterns from interaction")
+                
             except Exception as e:
-                logger.warning(f"Failed to save emotional state record: {e}", exc_info=True)
-                # Don't fail the request if emotional state save fails
+                logger.warning(f"Failed to save conversation data: {e}", exc_info=True)
+                # Don't fail the request if save fails
         
         # Save tasks to database
         if db:

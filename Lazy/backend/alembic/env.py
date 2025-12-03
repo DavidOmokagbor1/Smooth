@@ -12,7 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 # Import your models and config
 from app.core.config import settings
 from app.db.database import Base
-from app.db.models import Task, EmotionalStateRecord  # Import all models
+from app.db.models import (
+    Task, EmotionalStateRecord,
+    ConversationHistory, UserBehaviorPattern, ProactiveSuggestion
+)  # Import all models
 
 # this is the Alembic Config object
 config = context.config

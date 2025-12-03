@@ -6,7 +6,7 @@ Currently uses mock responses - will be replaced with real AI services increment
 
 import logging
 import json
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 
 try:
@@ -74,18 +74,21 @@ class AIService:
     
     async def process_text_input(
         self,
-        text: str
+        text: str,
+        context: Optional[Dict[str, Any]] = None
     ) -> VoiceProcessingResponse:
         """
         Process text input directly (alternative to voice).
+        Now with Siri-like context awareness!
         
         Args:
             text: Raw text input from user
+            context: Optional context from ContextService (conversation history, patterns, etc.)
             
         Returns:
             VoiceProcessingResponse with tasks, emotional state, and suggestions
         """
-        logger.info("Processing text input")
+        logger.info("Processing text input with context-aware reasoning")
         
         # Use text directly as transcript (no transcription needed)
         transcript = text.strip()
@@ -93,11 +96,11 @@ class AIService:
         # Detect emotional state from text
         emotional_state = await self._detect_emotion(None, transcript)
         
-        # Extract and prioritize tasks using GPT-4o
-        tasks = await self._extract_tasks(transcript, emotional_state)
+        # Extract and prioritize tasks using GPT-4o with context
+        tasks = await self._extract_tasks(transcript, emotional_state, context=context)
         
-        # Generate companion suggestion
-        companion_suggestion = await self._generate_suggestion(emotional_state, tasks)
+        # Generate companion suggestion with context
+        companion_suggestion = await self._generate_suggestion(emotional_state, tasks, context=context)
         
         # Determine processing mode
         processing_mode = "ai" if self.openai_client else "mock"
@@ -112,6 +115,7 @@ class AIService:
                 "whisper_enabled": False,  # No audio transcription
                 "gpt4o_enabled": bool(self.openai_client),
                 "input_type": "text",
+                "context_used": context is not None,
                 "timestamp": datetime.utcnow().isoformat()
             }
         )
@@ -119,20 +123,23 @@ class AIService:
     async def process_voice_input(
         self,
         audio_data: bytes,
-        content_type: Optional[str] = None
+        content_type: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None
     ) -> VoiceProcessingResponse:
         """
         Main processing pipeline for voice input.
+        Now with Siri-like context awareness!
         
         Args:
             audio_data: Raw audio file bytes
             content_type: MIME type of audio file
+            context: Optional context from ContextService (conversation history, patterns, etc.)
             
         Returns:
             VoiceProcessingResponse with tasks, emotional state, and suggestions
         """
         processing_mode = "ai" if self.openai_client else "mock"
-        logger.info(f"Processing voice input ({processing_mode} mode)")
+        logger.info(f"Processing voice input ({processing_mode} mode) with context-aware reasoning")
         
         # Step 1 - Transcribe audio using Whisper API
         transcript = await self._transcribe_audio(audio_data, content_type)
@@ -142,12 +149,12 @@ class AIService:
         emotional_state = await self._detect_emotion(audio_data, transcript)
         logger.info(f"Emotional state: {emotional_state.primary_emotion} (stress: {emotional_state.stress_level:.2f}, energy: {emotional_state.energy_level:.2f})")
         
-        # Step 3 - Extract and prioritize tasks using GPT-4o
-        tasks = await self._extract_tasks(transcript, emotional_state)
+        # Step 3 - Extract and prioritize tasks using GPT-4o with context
+        tasks = await self._extract_tasks(transcript, emotional_state, context=context)
         logger.info(f"Extracted {len(tasks)} tasks")
         
-        # Step 4 - Generate companion suggestion
-        companion_suggestion = await self._generate_suggestion(emotional_state, tasks)
+        # Step 4 - Generate companion suggestion with context
+        companion_suggestion = await self._generate_suggestion(emotional_state, tasks, context=context)
         
         return VoiceProcessingResponse(
             transcript=transcript,
@@ -158,6 +165,7 @@ class AIService:
                 "processing_mode": processing_mode,
                 "whisper_enabled": bool(self.openai_client),
                 "gpt4o_enabled": bool(self.openai_client),
+                "context_used": context is not None,
                 "timestamp": datetime.utcnow().isoformat()
             }
         )
@@ -316,10 +324,11 @@ class AIService:
     async def _extract_tasks(
         self,
         transcript: str,
-        emotional_state: EmotionalState
+        emotional_state: EmotionalState,
+        context: Optional[Dict[str, Any]] = None
     ) -> list[Task]:
         """
-        Extract and prioritize tasks using GPT-4o.
+        Extract and prioritize tasks using GPT-4o with Siri-like context awareness.
         Falls back to mock if OpenAI is not available.
         """
         import uuid
@@ -327,7 +336,7 @@ class AIService:
         # Use GPT-4o if available
         if self.openai_client:
             try:
-                return await self._extract_tasks_with_gpt4o(transcript, emotional_state)
+                return await self._extract_tasks_with_gpt4o(transcript, emotional_state, context=context)
             except Exception as e:
                 logger.error(f"Error calling GPT-4o: {e}. Falling back to mock.")
                 # Fall through to mock implementation
@@ -338,12 +347,28 @@ class AIService:
     async def _extract_tasks_with_gpt4o(
         self,
         transcript: str,
-        emotional_state: EmotionalState
+        emotional_state: EmotionalState,
+        context: Optional[Dict[str, Any]] = None
     ) -> list[Task]:
-        """Extract tasks using GPT-4o with structured output"""
+        """Extract tasks using GPT-4o with structured output and Siri-like context awareness"""
         import uuid
+        from app.services.context_service import ContextService
         
-        system_prompt = """You are an EXPERT AI assistant specializing in executive function support for people with ADHD, autism, burnout, and similar challenges. 
+        # Build context string if available
+        context_str = ""
+        if context:
+            context_service = ContextService()
+            context_str = context_service.format_context_for_ai(context)
+        
+        system_prompt = """You are an EXPERT AI assistant specializing in executive function support for people with ADHD, autism, burnout, and similar challenges.
+You have SIRI-LIKE INTELLIGENCE: You remember past conversations, learn user patterns, and reason contextually.
+
+CRITICAL: You have access to conversation history and learned patterns. Use this context to:
+1. Understand references to previous conversations ("that thing I mentioned", "the task from earlier")
+2. Recognize patterns in user behavior (when they typically do certain tasks)
+3. Avoid duplicating tasks that were already mentioned
+4. Connect related tasks across conversations
+5. Anticipate needs based on patterns 
 Your analysis must be DEEPLY INTELLIGENT, CONTEXT-AWARE, and EMPATHETIC.
 
 CRITICAL: You must think like a highly skilled executive function coach who understands:
@@ -462,15 +487,23 @@ CRITICAL RULES:
 5. Task titles must be SPECIFIC and ACTIONABLE, not vague
 6. Think about what the user can ACTUALLY do given their emotional state"""
 
-        user_prompt = f"""ANALYZE THIS TRANSCRIPT WITH DEEP INTELLIGENCE:
+        user_prompt = f"""ANALYZE THIS TRANSCRIPT WITH DEEP INTELLIGENCE AND CONTEXT AWARENESS:
 
-TRANSCRIPT:
+{context_str if context_str else "No previous context available - this is a new conversation."}
+
+CURRENT USER INPUT:
 "{transcript}"
 
 USER'S CURRENT STATE:
 - Primary emotion: {emotional_state.primary_emotion}
 - Energy level: {emotional_state.energy_level:.1f}/1.0 (0.0 = completely exhausted, 1.0 = fully energetic)
 - Stress level: {emotional_state.stress_level:.1f}/1.0 (0.0 = completely calm, 1.0 = highly stressed/overwhelmed)
+
+CONTEXT-AWARE REASONING:
+- If context shows previous conversations, check if user is referring to tasks mentioned earlier
+- Use learned patterns to understand when user typically does certain tasks
+- Consider active tasks from context - avoid duplicates unless user explicitly mentions them again
+- Use time patterns to suggest better timing for tasks
 
 EXAMPLES OF GOOD ANALYSIS:
 
@@ -763,16 +796,18 @@ THINK DEEPLY: What can this person ACTUALLY accomplish given their emotional sta
     async def _generate_suggestion(
         self,
         emotional_state: EmotionalState,
-        tasks: list[Task]
+        tasks: list[Task],
+        context: Optional[Dict[str, Any]] = None
     ) -> CompanionSuggestion:
         """
-        Generate companion suggestion based on emotional state and tasks.
+        Generate companion suggestion based on emotional state, tasks, and context.
         Uses GPT-4o if available, falls back to mock.
+        Now with Siri-like proactive intelligence!
         """
         # Use GPT-4o if available
         if self.openai_client:
             try:
-                return await self._generate_suggestion_with_gpt4o(emotional_state, tasks)
+                return await self._generate_suggestion_with_gpt4o(emotional_state, tasks, context=context)
             except Exception as e:
                 logger.error(f"Error generating suggestion with GPT-4o: {e}. Falling back to mock.")
                 # Fall through to mock
@@ -783,9 +818,11 @@ THINK DEEPLY: What can this person ACTUALLY accomplish given their emotional sta
     async def _generate_suggestion_with_gpt4o(
         self,
         emotional_state: EmotionalState,
-        tasks: list[Task]
+        tasks: list[Task],
+        context: Optional[Dict[str, Any]] = None
     ) -> CompanionSuggestion:
-        """Generate empathetic companion suggestion using GPT-4o"""
+        """Generate empathetic companion suggestion using GPT-4o with Siri-like context awareness"""
+        from app.services.context_service import ContextService
         
         # Prepare task summary
         task_summary = "\n".join([
@@ -793,7 +830,21 @@ THINK DEEPLY: What can this person ACTUALLY accomplish given their emotional sta
             for task in tasks[:5]
         ])
         
+        # Build context string if available
+        context_str = ""
+        if context:
+            context_service = ContextService()
+            context_str = context_service.format_context_for_ai(context)
+        
         system_prompt = """You are "Lazy", an EXPERT AI companion specializing in executive function support for people with ADHD, autism, burnout, and similar challenges.
+You have SIRI-LIKE INTELLIGENCE: You remember past conversations, learn user patterns, and provide proactive, context-aware suggestions.
+
+CRITICAL: You have access to conversation history and learned patterns. Use this to:
+1. Reference previous conversations naturally ("I remember you mentioned...")
+2. Use learned patterns to suggest optimal timing ("You typically do this in the morning")
+3. Anticipate needs based on patterns ("Based on your routine, you might want to...")
+4. Connect related tasks across conversations
+5. Provide personalized suggestions that feel like you truly know the user
 You combine deep psychological understanding with practical wisdom. You're not a productivity coach - you're a supportive guide who understands overwhelm.
 
 YOUR EXPERTISE:
@@ -875,7 +926,9 @@ Return a JSON object with:
 
 CRITICAL: Your suggestions must be REALISTIC given their emotional state. Don't suggest what they "should" do - suggest what they CAN do right now."""
 
-        user_prompt = f"""Generate a supportive companion message for this user:
+        user_prompt = f"""Generate a supportive, context-aware companion message for this user:
+
+{context_str if context_str else "No previous context - this is a new conversation."}
 
 Emotional State:
 - Primary emotion: {emotional_state.primary_emotion}
@@ -884,6 +937,13 @@ Emotional State:
 
 Their Tasks:
 {task_summary}
+
+CONTEXT-AWARE SUGGESTIONS:
+- Reference previous conversations if relevant ("I remember you mentioned...")
+- Use learned patterns to suggest optimal timing or approaches
+- If context shows active tasks, acknowledge them and suggest connections
+- Be proactive: anticipate needs based on patterns and time context
+- Make it feel personal, like you truly know and remember the user
 
 Remember: If they're stressed (stress > 0.7) and low energy (< 0.4), focus on just ONE simple task.
 Be empathetic, not pushy. Return ONLY valid JSON."""

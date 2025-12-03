@@ -29,6 +29,8 @@ import { OnboardingScreen } from './components/OnboardingScreen';
 import { SmartInsights } from './components/SmartInsights';
 import { CelebrationModal } from './components/CelebrationModal';
 import { ProgressDashboard } from './components/ProgressDashboard';
+import { AchievementSystem } from './components/AchievementSystem';
+import { MoodTracker } from './components/MoodTracker';
 
 import { Personality, Task, VoiceProcessingResponse, CompanionSuggestion } from './types';
 import { processVoiceInput, processTextInput, getTasks, completeTask, deleteTask, updateTask } from './services/api';
@@ -49,6 +51,8 @@ export default function App() {
   const [completedToday, setCompletedToday] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [totalCompleted, setTotalCompleted] = useState(0);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [showMoodTracker, setShowMoodTracker] = useState(false);
 
   // Check if user has seen onboarding
   useEffect(() => {
@@ -315,7 +319,19 @@ export default function App() {
               <View style={styles.headerRight}>
                 <Text style={styles.taskCount}>{tasks.length} total</Text>
                 <TouchableOpacity
-                  style={styles.progressButton}
+                  style={styles.iconButton}
+                  onPress={() => setShowMoodTracker(true)}
+                >
+                  <Ionicons name="heart" size={20} color="#EC4899" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => setShowAchievements(true)}
+                >
+                  <Ionicons name="trophy" size={20} color="#F59E0B" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.iconButton}
                   onPress={() => setShowProgress(true)}
                 >
                   <Ionicons name="stats-chart" size={20} color="#A78BFA" />
@@ -441,6 +457,42 @@ export default function App() {
           </View>
         </View>
       )}
+
+      {/* Achievement System Modal */}
+      {showAchievements && (
+        <View style={styles.progressModalOverlay}>
+          <TouchableOpacity
+            style={styles.progressModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowAchievements(false)}
+          />
+          <View style={styles.progressModalContent}>
+            <AchievementSystem
+              totalCompleted={totalCompleted}
+              streakDays={streakDays}
+              completedToday={completedToday}
+              onClose={() => setShowAchievements(false)}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Mood Tracker Modal */}
+      {showMoodTracker && (
+        <View style={styles.progressModalOverlay}>
+          <TouchableOpacity
+            style={styles.progressModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowMoodTracker(false)}
+          />
+          <View style={styles.progressModalContent}>
+            <MoodTracker
+              currentMood={emotionalState}
+              onClose={() => setShowMoodTracker(false)}
+            />
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -544,12 +596,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
   },
-  progressButton: {
+  iconButton: {
     padding: 8,
     backgroundColor: '#1E293B',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#334155',
+    marginLeft: 8,
   },
   progressModalOverlay: {
     position: 'absolute',

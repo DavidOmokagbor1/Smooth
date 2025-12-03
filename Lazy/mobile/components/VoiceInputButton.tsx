@@ -30,8 +30,9 @@ export function VoiceInputButton({
   const recordingStartTime = useRef<number | null>(null);
   const isStartingRecording = useRef<boolean>(false);
   const shouldStopRef = useRef<boolean>(false);
+  const isRecordingRef = useRef<boolean>(false); // Ref to track recording state for interval
   const minRecordingDuration = 1000; // Minimum 1 second to prevent accidental stops
-  const maxRecordingDuration = 60000; // Maximum 60 seconds (1 minute) to prevent accidental long recordings
+  const maxRecordingDuration = 300000; // Maximum 5 minutes (300 seconds) - allows longer recordings
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -106,24 +107,32 @@ export function VoiceInputButton({
       
       setRecording(newRecording);
       setIsRecording(true);
+      isRecordingRef.current = true; // Update ref
       recordingStartTime.current = Date.now();
       isStartingRecording.current = false;
       setRecordingDuration(0);
       console.log('✅ Recording started successfully');
 
-      // Start duration tracking
+      // Start duration tracking - use a more reliable interval
       durationIntervalRef.current = setInterval(() => {
-        if (recordingStartTime.current) {
+        if (recordingStartTime.current && isRecordingRef.current) {
           const elapsed = Date.now() - recordingStartTime.current;
           setRecordingDuration(elapsed);
           
-          // Auto-stop at max duration
+          // Auto-stop at max duration (5 minutes)
           if (elapsed >= maxRecordingDuration) {
-            console.log('⏱️ Maximum recording duration reached, stopping...');
+            console.log('⏱️ Maximum recording duration reached (5 minutes), stopping...');
+            isRecordingRef.current = false;
             stopRecording();
           }
+        } else {
+          // Clear interval if recording stopped
+          if (durationIntervalRef.current) {
+            clearInterval(durationIntervalRef.current);
+            durationIntervalRef.current = null;
+          }
         }
-      }, 100); // Update every 100ms
+      }, 250); // Update every 250ms for smooth counter
 
       // If stop was requested while starting, stop now
       if (shouldStopRef.current) {
@@ -162,6 +171,7 @@ export function VoiceInputButton({
     // If recording hasn't started yet, just reset state
     if (!recording) {
       setIsRecording(false);
+      isRecordingRef.current = false;
       recordingStartTime.current = null;
       shouldStopRef.current = false;
       return;
@@ -188,6 +198,7 @@ export function VoiceInputButton({
       }
       
       setIsRecording(false);
+      isRecordingRef.current = false; // Update ref
       recordingStartTime.current = null;
       shouldStopRef.current = false;
       setRecordingDuration(0);
@@ -221,6 +232,7 @@ export function VoiceInputButton({
       // Reset state even on error
       setRecording(null);
       setIsRecording(false);
+      isRecordingRef.current = false;
       recordingStartTime.current = null;
       shouldStopRef.current = false;
       setRecordingDuration(0);
@@ -277,12 +289,12 @@ export function VoiceInputButton({
       </Pressable>
       <Text style={styles.instructionText}>
         {isRecording 
-          ? `Recording... ${Math.floor(recordingDuration / 1000)}s` 
+          ? `Recording... ${formatDuration(recordingDuration)}` 
           : 'Press & hold to speak'}
       </Text>
-      {isRecording && recordingDuration >= maxRecordingDuration - 2000 && (
+      {isRecording && recordingDuration >= maxRecordingDuration - 10000 && (
         <Text style={styles.warningText}>
-          Maximum duration reached
+          {Math.ceil((maxRecordingDuration - recordingDuration) / 1000)}s remaining
         </Text>
       )}
       {!hasPermission && (
@@ -292,6 +304,18 @@ export function VoiceInputButton({
       )}
     </View>
   );
+}
+
+// Helper function to format duration
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
 }
 
 const styles = StyleSheet.create({

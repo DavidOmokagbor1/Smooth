@@ -98,13 +98,13 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   column: {
-    width: 280,
+    width: 240,  // Reduced from 280 for better fit
     backgroundColor: '#1A1F2E',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#2A2F3E',
-    padding: 16,
-    maxHeight: 600,
+    padding: 14,  // Slightly reduced padding
+    maxHeight: 500,  // Reduced max height
   },
   columnHighlighted: {
     borderColor: '#FFA94D40',

@@ -14,10 +14,15 @@ import {
   ScrollView,
   Alert,
   Switch,
+  TextInput,
+  Linking,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Task } from '../types';
 import * as Notifications from 'expo-notifications';
+import * as Calendar from 'expo-calendar';
+import * as Contacts from 'expo-contacts';
 // Date picker - install with: npx expo install @react-native-community/datetimepicker
 let DateTimePicker: any = null;
 try {
@@ -48,6 +53,10 @@ export function TaskDetailModal({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [reminderTime, setReminderTime] = useState<Date | null>(null);
   const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contacts.Contact | null>(null);
+  const [contactNote, setContactNote] = useState<string>('');
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [contacts, setContacts] = useState<Contacts.Contact[]>([]);
 
   // Update reminder state when task changes
   useEffect(() => {
@@ -59,6 +68,105 @@ export function TaskDetailModal({
       setReminderEnabled(false);
     }
   }, [task]);
+
+  // Load contacts when modal opens
+  useEffect(() => {
+    if (visible) {
+      loadContacts();
+    }
+  }, [visible]);
+
+  const loadContacts = async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status === 'granted') {
+        const { data } = await Contacts.getContactsAsync({
+          fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
+        });
+        setContacts(data.slice(0, 50)); // Limit to 50 for performance
+      }
+    } catch (error) {
+      console.error('Error loading contacts:', error);
+    }
+  };
+
+  const handleOpenCalendar = async () => {
+    try {
+      const { status } = await Calendar.requestCalendarPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Calendar access is needed to create events.');
+        return;
+      }
+
+      const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+      const defaultCalendar = calendars.find(c => c.allowsModifications) || calendars[0];
+
+      if (!defaultCalendar) {
+        Alert.alert('Error', 'No calendar available.');
+        return;
+      }
+
+      const startDate = reminderTime || new Date();
+      const endDate = new Date(startDate.getTime() + (task.category?.estimated_duration_minutes || 30) * 60 * 1000);
+      const deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      const eventDetails: any = {
+        title: task.title,
+        startDate: startDate,
+        endDate: endDate,
+        timeZone: deviceTimeZone,
+        notes: task.description || '',
+        location: task.category?.location || '',
+        calendarId: defaultCalendar.id,
+      };
+
+      const eventId = await Calendar.createEventAsync(defaultCalendar.id, eventDetails);
+      
+      // Try to open the calendar app to show the event
+      try {
+        // For iOS, open the calendar app
+        if (Platform.OS === 'ios') {
+          await Linking.openURL('calshow:');
+        } else {
+          // For Android, open calendar app
+          await Linking.openURL('content://com.android.calendar/time');
+        }
+      } catch (error) {
+        // If opening calendar fails, just show success message
+        console.log('Could not open calendar app:', error);
+      }
+      
+      Alert.alert(
+        'Added to Calendar!',
+        `"${task.title}" has been added to ${defaultCalendar.title}.`,
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      console.error('Error creating calendar event:', error);
+      Alert.alert('Error', 'Failed to create calendar event. Please try again.');
+    }
+  };
+
+  const handleSelectContact = async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Contact access is needed to select a contact.');
+        return;
+      }
+
+      setShowContactPicker(true);
+    } catch (error) {
+      console.error('Error requesting contact permission:', error);
+    }
+  };
+
+  const handleCallContact = () => {
+    if (selectedContact?.phoneNumbers && selectedContact.phoneNumbers.length > 0) {
+      const phoneNumber = selectedContact.phoneNumbers[0].number;
+      Linking.openURL(`tel:${phoneNumber}`);
+    }
+  };
 
   if (!task) return null;
 
@@ -77,8 +185,11 @@ export function TaskDetailModal({
 
   const priority = getPriorityConfig(task.priority);
 
-  const handleSetReminder = async () => {
-    if (!reminderTime) {
+  const handleSetReminder = async (selectedTime?: Date) => {
+    // Use the passed time or fall back to state (for when called from button)
+    const timeToUse = selectedTime || reminderTime;
+    
+    if (!timeToUse) {
       Alert.alert('Select Time', 'Please select a reminder time first.');
       return;
     }
@@ -98,7 +209,7 @@ export function TaskDetailModal({
       // Schedule notification
       // Calculate seconds until reminder
       const now = new Date();
-      const secondsUntilReminder = Math.max(0, Math.floor((reminderTime.getTime() - now.getTime()) / 1000));
+      const secondsUntilReminder = Math.max(0, Math.floor((timeToUse.getTime() - now.getTime()) / 1000));
       
       if (secondsUntilReminder <= 0) {
         Alert.alert('Invalid Time', 'Reminder time must be in the future.');
@@ -115,14 +226,15 @@ export function TaskDetailModal({
           sound: true,
           data: { taskId: task.id },
         },
-        trigger: reminderTime,
+        trigger: timeToUse,
       });
 
       if (onSetReminder) {
-        onSetReminder(task.id, reminderTime);
+        onSetReminder(task.id, timeToUse);
       }
 
-      Alert.alert('Reminder Set!', `You'll be reminded at ${reminderTime.toLocaleTimeString()}.`);
+      Alert.alert('Reminder Set!', `You'll be reminded at ${timeToUse.toLocaleTimeString()}.`);
+      setReminderTime(timeToUse);
       setReminderEnabled(true);
     } catch (error: any) {
       console.error('Error setting reminder:', error);
@@ -276,8 +388,8 @@ export function TaskDetailModal({
                       onChange={(event: any, selectedDate?: Date) => {
                         setShowDatePicker(false);
                         if (selectedDate) {
-                          setReminderTime(selectedDate);
-                          handleSetReminder();
+                          // Pass selectedDate directly to handleSetReminder to avoid async state issue
+                          handleSetReminder(selectedDate);
                         }
                       }}
                     />
@@ -292,6 +404,151 @@ export function TaskDetailModal({
                 </View>
               )}
             </View>
+
+            {/* Calendar Integration */}
+            <View style={styles.section}>
+              <View style={styles.insightsHeader}>
+                <Ionicons name="calendar-outline" size={20} color="#3B82F6" />
+                <Text style={styles.sectionTitle}>Calendar</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.actionCard}
+                onPress={handleOpenCalendar}
+                activeOpacity={0.8}
+              >
+                <View style={styles.actionCardContent}>
+                  <Ionicons name="calendar" size={24} color="#3B82F6" />
+                  <View style={styles.actionCardText}>
+                    <Text style={styles.actionCardTitle}>Add to Calendar</Text>
+                    <Text style={styles.actionCardSubtitle}>
+                      Create event in your calendar app
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#64748B" />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Contact Integration */}
+            <View style={styles.section}>
+              <View style={styles.insightsHeader}>
+                <Ionicons name="person-outline" size={20} color="#10B981" />
+                <Text style={styles.sectionTitle}>Contact & Call</Text>
+              </View>
+              
+              {!selectedContact ? (
+                <TouchableOpacity
+                  style={styles.actionCard}
+                  onPress={handleSelectContact}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.actionCardContent}>
+                    <Ionicons name="person-add" size={24} color="#10B981" />
+                    <View style={styles.actionCardText}>
+                      <Text style={styles.actionCardTitle}>Link Contact</Text>
+                      <Text style={styles.actionCardSubtitle}>
+                        Add a contact for this task
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#64748B" />
+                  </View>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.contactCard}>
+                  <View style={styles.contactInfo}>
+                    <View style={styles.contactAvatar}>
+                      <Ionicons name="person" size={24} color="#10B981" />
+                    </View>
+                    <View style={styles.contactDetails}>
+                      <Text style={styles.contactName}>{selectedContact.name}</Text>
+                      {selectedContact.phoneNumbers && selectedContact.phoneNumbers.length > 0 && (
+                        <Text style={styles.contactPhone}>
+                          {selectedContact.phoneNumbers[0].number}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.contactActions}>
+                    <TouchableOpacity
+                      style={styles.callButton}
+                      onPress={handleCallContact}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="call" size={18} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => setSelectedContact(null)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="close" size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {selectedContact && (
+                <View style={styles.noteSection}>
+                  <Text style={styles.noteLabel}>Quick Note</Text>
+                  <TextInput
+                    style={styles.noteInput}
+                    placeholder="Add a note about this contact..."
+                    placeholderTextColor="#64748B"
+                    value={contactNote}
+                    onChangeText={setContactNote}
+                    multiline
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Contact Picker Modal */}
+            {showContactPicker && (
+              <Modal
+                visible={showContactPicker}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowContactPicker(false)}
+              >
+                <View style={styles.contactPickerOverlay}>
+                  <View style={styles.contactPickerModal}>
+                    <View style={styles.contactPickerHeader}>
+                      <Text style={styles.contactPickerTitle}>Select Contact</Text>
+                      <TouchableOpacity
+                        onPress={() => setShowContactPicker(false)}
+                        style={styles.closeButton}
+                      >
+                        <Ionicons name="close" size={24} color="#94A3B8" />
+                      </TouchableOpacity>
+                    </View>
+                    <ScrollView style={styles.contactList}>
+                      {contacts.map((contact) => (
+                        <TouchableOpacity
+                          key={contact.id}
+                          style={styles.contactItem}
+                          onPress={() => {
+                            setSelectedContact(contact);
+                            setShowContactPicker(false);
+                          }}
+                        >
+                          <View style={styles.contactAvatarSmall}>
+                            <Ionicons name="person" size={20} color="#10B981" />
+                          </View>
+                          <View style={styles.contactItemDetails}>
+                            <Text style={styles.contactItemName}>{contact.name}</Text>
+                            {contact.phoneNumbers && contact.phoneNumbers.length > 0 && (
+                              <Text style={styles.contactItemPhone}>
+                                {contact.phoneNumbers[0].number}
+                              </Text>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
+            )}
 
             {/* AI Insights Section */}
             <View style={styles.section}>
@@ -540,6 +797,168 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#94A3B8',
     textAlign: 'center',
+  },
+  actionCard: {
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#2A2F3E',
+  },
+  actionCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionCardText: {
+    flex: 1,
+  },
+  actionCardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#F8FAFC',
+    marginBottom: 4,
+  },
+  actionCardSubtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
+  },
+  contactCard: {
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#10B98140',
+  },
+  contactInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  contactAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#10B98120',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contactDetails: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F8FAFC',
+    marginBottom: 4,
+  },
+  contactPhone: {
+    fontSize: 14,
+    color: '#94A3B8',
+  },
+  contactActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  callButton: {
+    backgroundColor: '#10B981',
+    borderRadius: 8,
+    padding: 10,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeButton: {
+    backgroundColor: '#1F2937',
+    borderRadius: 8,
+    padding: 10,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EF444440',
+  },
+  noteSection: {
+    marginTop: 12,
+  },
+  noteLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94A3B8',
+    marginBottom: 8,
+  },
+  noteInput: {
+    backgroundColor: '#1F2937',
+    borderRadius: 8,
+    padding: 12,
+    color: '#F8FAFC',
+    fontSize: 14,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: '#2A2F3E',
+  },
+  contactPickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  contactPickerModal: {
+    backgroundColor: '#1A1F2E',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingTop: 20,
+  },
+  contactPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2A2F3E',
+  },
+  contactPickerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  contactList: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2A2F3E',
+    gap: 12,
+  },
+  contactAvatarSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#10B98120',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contactItemDetails: {
+    flex: 1,
+  },
+  contactItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F8FAFC',
+    marginBottom: 4,
+  },
+  contactItemPhone: {
+    fontSize: 14,
+    color: '#94A3B8',
   },
 });
 

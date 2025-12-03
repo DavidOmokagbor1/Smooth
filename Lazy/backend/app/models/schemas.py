@@ -50,10 +50,14 @@ class Task(BaseModel):
     """Extracted and processed task"""
     id: str = Field(..., description="Unique task identifier")
     title: str = Field(..., description="Task title/description")
+    description: Optional[str] = Field(None, description="Task description/details")
     priority: TaskPriority = Field(..., description="Assigned priority based on urgency and user state")
     category: TaskCategory = Field(..., description="Task categorization")
     original_text: str = Field(..., description="Original text from user input")
     suggested_time: Optional[datetime] = Field(None, description="AI-suggested time to complete")
+    due_date: Optional[datetime] = Field(None, description="Task due date")
+    reminder_time: Optional[datetime] = Field(None, description="Reminder time for the task")
+    status: Optional[str] = Field(None, description="Task status (pending, in_progress, completed, cancelled)")
     location_coordinates: Optional[dict] = Field(None, description="GPS coordinates if location-based")
     
     class Config:

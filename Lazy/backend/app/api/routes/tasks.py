@@ -280,6 +280,7 @@ def _task_to_schema(task: Task) -> TaskSchema:
     return TaskSchema(
         id=task.id,
         title=task.title,
+        description=task.description,
         priority=TaskPrioritySchema(task.priority.value),
         category=TaskCategory(
             type=task.category_type or "personal",
@@ -288,6 +289,9 @@ def _task_to_schema(task: Task) -> TaskSchema:
         ),
         original_text=task.original_text or task.title,
         suggested_time=task.suggested_time,
+        due_date=task.due_date,
+        reminder_time=task.reminder_time,
+        status=task.status.value if task.status else "pending",
         location_coordinates=task.location_coordinates,
     )
 

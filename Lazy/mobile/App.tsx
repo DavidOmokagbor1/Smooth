@@ -347,8 +347,11 @@ export default function App() {
                 isProcessing={isProcessing}
               />
             )}
+          </View>
 
-            {/* Predictive Card - Smart suggestions */}
+          {/* Tasks Section */}
+          <View style={styles.tasksSection}>
+            {/* Predictive Card - Smart suggestions (moved here, away from chat) */}
             {tasks.length > 0 && (
               <PredictiveCard
                 tasks={tasks}
@@ -356,16 +359,31 @@ export default function App() {
                 onSuggestionPress={async (suggestion) => {
                   if (suggestion === 'Plan your route for errands') {
                     await handlePlanRoute();
+                  } else if (suggestion === 'Add appointments to calendar') {
+                    // Find appointment tasks and suggest adding to calendar
+                    const appointmentTasks = tasks.filter(t => 
+                      t.category?.type === 'appointment' || t.due_date
+                    );
+                    if (appointmentTasks.length > 0) {
+                      Alert.alert(
+                        'Add to Calendar',
+                        `You have ${appointmentTasks.length} appointment${appointmentTasks.length > 1 ? 's' : ''}. Open a task to add it to your calendar.`,
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  } else if (suggestion === 'Link contacts to tasks') {
+                    Alert.alert(
+                      'Link Contacts',
+                      'Open a task to link a contact. This makes calling easier!',
+                      [{ text: 'OK' }]
+                    );
                   } else {
                     console.log('Suggestion pressed:', suggestion);
                   }
                 }}
               />
             )}
-          </View>
-
-          {/* Tasks Section */}
-          <View style={styles.tasksSection}>
+            
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
                 <Text style={styles.sectionTitle}>Your Tasks</Text>

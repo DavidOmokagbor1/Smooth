@@ -155,6 +155,38 @@ function generatePredictions(
     });
   }
 
+  // Calendar integration suggestions
+  const appointmentTasks = tasks.filter(t => t.category?.type === 'appointment' || t.due_date);
+  if (appointmentTasks.length > 0 && !appointmentTasks.some(t => t.reminder_time)) {
+    predictions.push({
+      type: 'time',
+      title: 'Calendar Integration',
+      message: `You have ${appointmentTasks.length} appointment${appointmentTasks.length > 1 ? 's' : ''}. Add them to your calendar for better organization!`,
+      icon: 'calendar',
+      color: '#3B82F6',
+      suggestion: 'Add appointments to calendar',
+      confidence: 0.80,
+    });
+  }
+
+  // Contact integration suggestions
+  const callTasks = tasks.filter(t => 
+    t.title.toLowerCase().includes('call') || 
+    t.title.toLowerCase().includes('phone') ||
+    t.category?.type === 'appointment'
+  );
+  if (callTasks.length > 0) {
+    predictions.push({
+      type: 'pattern',
+      title: 'Link Contacts',
+      message: `Some tasks involve calling people. Link contacts to make calling easier!`,
+      icon: 'person-add',
+      color: '#10B981',
+      suggestion: 'Link contacts to tasks',
+      confidence: 0.75,
+    });
+  }
+
   // Completion-based predictions
   if (tasks.filter(t => t.priority === 'critical' || t.priority === 'high').length === 0 && tasks.length > 0) {
     predictions.push({

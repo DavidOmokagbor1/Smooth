@@ -27,6 +27,8 @@ import { AIResponse } from './components/AIResponse';
 import { ErrorMessage } from './components/ErrorMessage';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { SmartInsights } from './components/SmartInsights';
+import { CelebrationModal } from './components/CelebrationModal';
+import { ProgressDashboard } from './components/ProgressDashboard';
 
 import { Personality, Task, VoiceProcessingResponse, CompanionSuggestion } from './types';
 import { processVoiceInput, processTextInput, getTasks, completeTask, deleteTask, updateTask } from './services/api';
@@ -41,6 +43,12 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [lastAudioUri, setLastAudioUri] = useState<string | null>(null);
   const [emotionalState, setEmotionalState] = useState<{ primary_emotion: string; energy_level: number; stress_level: number } | undefined>();
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [completedTaskTitle, setCompletedTaskTitle] = useState<string>('');
+  const [showProgress, setShowProgress] = useState(false);
+  const [completedToday, setCompletedToday] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
+  const [totalCompleted, setTotalCompleted] = useState(0);
 
   // Check if user has seen onboarding
   useEffect(() => {
@@ -153,13 +161,26 @@ export default function App() {
 
   const handleTaskComplete = useCallback(async (taskId: string) => {
     try {
+      // Find the task before completing to show in celebration
+      const taskToComplete = tasks.find(t => t.id === taskId);
+      const taskTitle = taskToComplete?.title || 'Task';
+      
       await completeTask(taskId);
+      
+      // Show celebration
+      setCompletedTaskTitle(taskTitle);
+      setShowCelebration(true);
+      
+      // Update stats
+      setCompletedToday(prev => prev + 1);
+      setTotalCompleted(prev => prev + 1);
+      
       // Reload tasks
       await loadTasks();
     } catch (error: any) {
       Alert.alert('Error', 'Failed to complete task. Please try again.');
     }
-  }, []);
+  }, [tasks]);
 
   const handleTaskDelete = useCallback(async (taskId: string) => {
     Alert.alert(
@@ -291,7 +312,15 @@ export default function App() {
                   Organized by priority • AI-powered
                 </Text>
               </View>
-              <Text style={styles.taskCount}>{tasks.length} total</Text>
+              <View style={styles.headerRight}>
+                <Text style={styles.taskCount}>{tasks.length} total</Text>
+                <TouchableOpacity
+                  style={styles.progressButton}
+                  onPress={() => setShowProgress(true)}
+                >
+                  <Ionicons name="stats-chart" size={20} color="#A78BFA" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Do Now - Priority Section */}
@@ -382,6 +411,36 @@ export default function App() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Celebration Modal */}
+      <CelebrationModal
+        visible={showCelebration}
+        onClose={() => setShowCelebration(false)}
+        personality={personality}
+        taskTitle={completedTaskTitle}
+        streakCount={streakDays}
+        totalCompleted={completedToday}
+      />
+
+      {/* Progress Dashboard Modal */}
+      {showProgress && (
+        <View style={styles.progressModalOverlay}>
+          <TouchableOpacity
+            style={styles.progressModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowProgress(false)}
+          />
+          <View style={styles.progressModalContent}>
+            <ProgressDashboard
+              tasks={tasks}
+              completedToday={completedToday}
+              streakDays={streakDays}
+              totalCompleted={totalCompleted}
+              onClose={() => setShowProgress(false)}
+            />
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -471,6 +530,11 @@ const styles = StyleSheet.create({
     color: '#64748B',
     letterSpacing: 0.3,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   taskCount: {
     fontSize: 14,
     fontWeight: '600',
@@ -479,6 +543,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
+  },
+  progressButton: {
+    padding: 8,
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  progressModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  progressModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  progressModalContent: {
+    position: 'absolute',
+    top: '10%',
+    left: 0,
+    right: 0,
+    bottom: '10%',
+    paddingHorizontal: 20,
   },
   prioritySection: {
     marginBottom: 32,

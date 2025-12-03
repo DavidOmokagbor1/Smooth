@@ -23,6 +23,7 @@ import { Header } from './components/Header';
 import { PersonalitySelector } from './components/PersonalitySelector';
 import { VoiceInputButton } from './components/VoiceInputButton';
 import { TaskCard } from './components/TaskCard';
+import { TaskColumns } from './components/TaskColumns';
 import { AIResponse } from './components/AIResponse';
 import { ErrorMessage } from './components/ErrorMessage';
 import { OnboardingScreen } from './components/OnboardingScreen';
@@ -354,76 +355,16 @@ export default function App() {
               </View>
             </View>
 
-            {/* Do Now - Priority Section */}
-            {doNowTasks.length > 0 && (
-              <View style={styles.prioritySection}>
-                <View style={styles.priorityHeader}>
-                  <View style={styles.priorityHeaderLeft}>
-                    <Ionicons name="flash" size={20} color="#F59E0B" />
-                    <Text style={styles.priorityTitle}>Do Now</Text>
-                  </View>
-                  <Text style={styles.priorityCount}>{doNowTasks.length}</Text>
-                </View>
-                <View style={styles.tasksList}>
-                  {doNowTasks.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onComplete={handleTaskComplete}
-                      onDelete={handleTaskDelete}
-                      onEdit={handleTaskUpdate}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Do Later - Medium Priority Section */}
-            {doLaterTasks.length > 0 && (
-              <View style={styles.prioritySection}>
-                <View style={styles.priorityHeader}>
-                  <View style={styles.priorityHeaderLeft}>
-                    <Ionicons name="time" size={20} color="#3B82F6" />
-                    <Text style={styles.priorityTitle}>Do Later</Text>
-                  </View>
-                  <Text style={styles.priorityCount}>{doLaterTasks.length}</Text>
-                </View>
-                <View style={styles.tasksList}>
-                  {doLaterTasks.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onComplete={handleTaskComplete}
-                      onDelete={handleTaskDelete}
-                      onEdit={handleTaskUpdate}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Optional - Low Priority Section */}
-            {optionalTasks.length > 0 && (
-              <View style={styles.prioritySection}>
-                <View style={styles.priorityHeader}>
-                  <View style={styles.priorityHeaderLeft}>
-                    <Ionicons name="star" size={20} color="#8B5CF6" />
-                    <Text style={styles.priorityTitle}>Optional</Text>
-                  </View>
-                  <Text style={styles.priorityCount}>{optionalTasks.length}</Text>
-                </View>
-                <View style={styles.tasksList}>
-                  {optionalTasks.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onComplete={handleTaskComplete}
-                      onDelete={handleTaskDelete}
-                      onEdit={handleTaskUpdate}
-                    />
-                  ))}
-                </View>
-              </View>
+            {/* Horizontal Priority Columns - Side by Side for Easy Comparison */}
+            {tasks.length > 0 && (
+              <TaskColumns
+                doNowTasks={doNowTasks}
+                doLaterTasks={doLaterTasks}
+                optionalTasks={optionalTasks}
+                onTaskComplete={handleTaskComplete}
+                onTaskDelete={handleTaskDelete}
+                onTaskUpdate={handleTaskUpdate}
+              />
             )}
 
             {/* Empty State */}
@@ -674,16 +615,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   prioritySection: {
-    marginBottom: 24,
+    marginBottom: 28,
   },
   priorityHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 10,
+    marginBottom: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
+    borderBottomColor: '#2A2F3E',
   },
   priorityHeaderLeft: {
     flexDirection: 'row',
@@ -691,24 +632,25 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   priorityTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#F1F5F9',
-    letterSpacing: 0.1,
+    color: '#F8FAFC',
+    letterSpacing: -0.3,
   },
   priorityCount: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#64748B',
-    backgroundColor: '#1E293B',
+    color: '#94A3B8',
+    backgroundColor: '#1F2937',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    minWidth: 32,
+    paddingVertical: 5,
+    borderRadius: 12,
+    minWidth: 36,
     textAlign: 'center',
+    overflow: 'hidden',
   },
   tasksList: {
-    gap: 10,
+    gap: 0, // TaskCard already has marginBottom
   },
   emptyStateContainer: {
     paddingVertical: 48,

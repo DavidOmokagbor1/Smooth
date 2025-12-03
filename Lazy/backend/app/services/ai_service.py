@@ -472,6 +472,37 @@ USER'S CURRENT STATE:
 - Energy level: {emotional_state.energy_level:.1f}/1.0 (0.0 = completely exhausted, 1.0 = fully energetic)
 - Stress level: {emotional_state.stress_level:.1f}/1.0 (0.0 = completely calm, 1.0 = highly stressed/overwhelmed)
 
+EXAMPLES OF GOOD ANALYSIS:
+
+Example 1 - Overwhelmed User:
+Input: "I'm so stressed. I have a doctor appointment tomorrow at 2pm, need to pick up my prescription, and I'm behind on that work project due Friday."
+User State: stress=0.8, energy=0.3
+Analysis: 
+- Doctor appointment (tomorrow 2pm) → HIGH priority (health, scheduled)
+- Pick up prescription → HIGH priority (health-related, can batch with appointment)
+- Work project (due Friday) → MEDIUM priority (not urgent yet, user overwhelmed)
+- Extract only 2-3 tasks, break down work project if complex
+Result: Focus on health tasks, defer work project
+
+Example 2 - High Energy User:
+Input: "I need to go grocery shopping, call my mom, finish the report, and maybe clean the kitchen."
+User State: stress=0.3, energy=0.8
+Analysis:
+- Grocery shopping → MEDIUM priority (errand, can be done anytime)
+- Call mom → MEDIUM priority (personal, not urgent)
+- Finish report → HIGH priority (work, likely important)
+- Clean kitchen → LOW priority (optional, "maybe")
+Result: Prioritize report, can batch errands, include optional tasks
+
+Example 3 - Time-Sensitive:
+Input: "I have a meeting at 3pm today, need to submit the invoice by 5pm, and should probably exercise."
+User State: stress=0.6, energy=0.5
+Analysis:
+- Meeting (3pm today) → CRITICAL (time-specific, today)
+- Submit invoice (5pm deadline) → CRITICAL (deadline today)
+- Exercise → LOW priority (optional, "probably")
+Result: Focus on time-critical tasks, exercise can wait
+
 ANALYSIS REQUIRED (Think step by step):
 
 STEP 1: IDENTIFY ALL TASKS

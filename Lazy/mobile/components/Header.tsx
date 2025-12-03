@@ -7,7 +7,11 @@ import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HelpTooltip } from './HelpTooltip';
 
-export function Header() {
+interface HeaderProps {
+  onSettingsPress?: () => void;
+}
+
+export function Header({ onSettingsPress }: HeaderProps) {
   return (
     <View style={styles.container}>
       <View style={styles.leftSection}>
@@ -16,7 +20,11 @@ export function Header() {
       </View>
       <View style={styles.rightSection}>
         <HelpTooltip />
-        <TouchableOpacity style={styles.iconButton}>
+        <TouchableOpacity 
+          style={styles.iconButton}
+          onPress={onSettingsPress}
+          activeOpacity={0.7}
+        >
           <Ionicons name="settings" size={20} color="#E5E7EB" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.avatar}>

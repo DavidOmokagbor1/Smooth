@@ -26,8 +26,8 @@ import { TaskCard } from './components/TaskCard';
 import { AIResponse } from './components/AIResponse';
 import { ErrorMessage } from './components/ErrorMessage';
 import { OnboardingScreen } from './components/OnboardingScreen';
-import { SmartInsights } from './components/SmartInsights';
 import { CelebrationModal } from './components/CelebrationModal';
+import { SettingsModal } from './components/SettingsModal';
 import { ProgressDashboard } from './components/ProgressDashboard';
 import { AchievementSystem } from './components/AchievementSystem';
 import { MoodTracker } from './components/MoodTracker';
@@ -57,6 +57,7 @@ export default function App() {
   const [showMoodTracker, setShowMoodTracker] = useState(false);
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [achievementsUnlocked, setAchievementsUnlocked] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Check if user has seen onboarding
   useEffect(() => {
@@ -240,7 +241,7 @@ export default function App() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <Header />
+        <Header onSettingsPress={() => setShowSettings(true)} />
 
         <ScrollView
           style={styles.scrollView}
@@ -299,14 +300,6 @@ export default function App() {
                 suggestion={suggestion}
                 personality={personality}
                 isProcessing={isProcessing}
-              />
-            )}
-
-            {/* Smart Insights - Shows how AI is helping */}
-            {tasks.length > 0 && (
-              <SmartInsights
-                tasks={tasks}
-                emotionalState={emotionalState}
               />
             )}
 
@@ -541,6 +534,14 @@ export default function App() {
           </View>
         </View>
       )}
+
+      {/* Settings Modal */}
+      <SettingsModal
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+        personality={personality}
+        onPersonalityChange={setPersonality}
+      />
     </SafeAreaView>
   );
 }
@@ -560,31 +561,31 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   personalitySection: {
-    paddingVertical: 20,
+    paddingVertical: 16,
     paddingHorizontal: 4,
   },
   voiceSection: {
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 32,
+    marginBottom: 24,
     paddingTop: 8,
   },
   textInputContainer: {
     flexDirection: 'row',
     width: '100%',
-    marginTop: 20,
+    marginTop: 16,
     backgroundColor: '#1E293B',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#334155',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   textInput: {
     flex: 1,
@@ -595,11 +596,11 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     padding: 8,
-    marginLeft: 12,
+    marginLeft: 10,
     backgroundColor: '#7C3AED',
-    borderRadius: 12,
-    width: 36,
-    height: 36,
+    borderRadius: 10,
+    width: 34,
+    height: 34,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -611,46 +612,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 24,
-    paddingTop: 8,
+    marginBottom: 20,
+    paddingTop: 4,
   },
   sectionTitleContainer: {
     flex: 1,
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
     marginBottom: 4,
   },
   sectionSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: '#64748B',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   taskCount: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#94A3B8',
     backgroundColor: '#1E293B',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   iconButton: {
-    padding: 8,
+    padding: 7,
     backgroundColor: '#1E293B',
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#334155',
-    marginLeft: 8,
+    marginLeft: 6,
   },
   progressModalOverlay: {
     position: 'absolute',
@@ -673,14 +674,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   prioritySection: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   priorityHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 12,
+    marginBottom: 12,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#1E293B',
   },
@@ -690,10 +691,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   priorityTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#F1F5F9',
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   priorityCount: {
     fontSize: 14,
@@ -707,7 +708,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tasksList: {
-    gap: 12,
+    gap: 10,
   },
   emptyStateContainer: {
     paddingVertical: 48,

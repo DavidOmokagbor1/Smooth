@@ -8,12 +8,18 @@ from fastapi import APIRouter, HTTPException, Depends, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 from typing import Optional
+from pydantic import BaseModel, Field
 
 from app.models.schemas import VoiceProcessingResponse
 from app.services.ai_service import AIService
 from app.db.database import get_db
 from app.db.repositories import TaskRepository, EmotionalStateRepository
 from app.db.models import TaskPriority, EnergyCost
+
+
+class TextInputRequest(BaseModel):
+    """Request model for text input processing"""
+    text: str = Field(..., min_length=1, max_length=5000, description="Text input containing user's tasks and thoughts")
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +31,7 @@ ai_service = AIService()
 
 @router.post("/process-text-input", response_model=VoiceProcessingResponse)
 async def process_text_input(
-    text: str = Body(..., description="Text input containing user's tasks and thoughts"),
+    request: TextInputRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -40,23 +46,19 @@ async def process_text_input(
     This is the text-based alternative to voice input.
     """
     try:
-        # Validate text input
-        if not text or not text.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="Text input cannot be empty."
-            )
+        # Extract text from request
+        text = request.text.strip()
         
-        if len(text) > 5000:
+        # Additional validation (Pydantic handles min/max length, but we check empty after strip)
+        if not text:
             raise HTTPException(
                 status_code=400,
-                detail="Text input is too long. Maximum 5000 characters."
+                detail="Text input cannot be empty or only whitespace."
             )
         
         logger.info(f"Received text input: {len(text)} characters")
         
         # Process through AI service (using text directly, no transcription needed)
-        # We'll create a modified version that accepts text directly
         response = await ai_service.process_text_input(text)
         
         # Save emotional state record
@@ -68,7 +70,7 @@ async def process_text_input(
                     energy_level=response.emotional_state.energy_level,
                     stress_level=response.emotional_state.stress_level,
                     confidence=response.emotional_state.confidence,
-                    transcript_text=text,  # Use input text as transcript
+                    transcript_text=text[:1000],  # Use input text as transcript (truncate if too long)
                     task_count=len(response.tasks),
                 )
             except Exception as e:

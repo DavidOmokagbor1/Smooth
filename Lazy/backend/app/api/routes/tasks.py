@@ -96,52 +96,110 @@ async def update_task(
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Update a task"""
+    """Update a task with comprehensive error handling"""
     try:
+        # Validate task_id format
+        if not task_id or not task_id.strip():
+            raise HTTPException(status_code=400, detail="Task ID cannot be empty")
+        
+        task_id = task_id.strip()
+        
+        # Get existing task
         task = await TaskRepository.get_by_id(db, task_id)
         if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
+            raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
         
+        # Build update data with validation
         update_data = {}
+        
         if title is not None:
-            if not title.strip():
-                raise HTTPException(status_code=400, detail="Title cannot be empty")
-            update_data["title"] = title.strip()
+            title_trimmed = title.strip() if title else ""
+            if not title_trimmed:
+                raise HTTPException(status_code=400, detail="Title cannot be empty or only whitespace")
+            if len(title_trimmed) > 500:
+                raise HTTPException(status_code=400, detail="Title is too long. Maximum 500 characters.")
+            update_data["title"] = title_trimmed
+        
         if description is not None:
-            update_data["description"] = description.strip() if description else None
+            if description:
+                description_trimmed = description.strip()
+                if len(description_trimmed) > 2000:
+                    raise HTTPException(status_code=400, detail="Description is too long. Maximum 2000 characters.")
+                update_data["description"] = description_trimmed
+            else:
+                update_data["description"] = None
+        
         if priority is not None:
-            try:
-                update_data["priority"] = TaskPriority(priority.lower())
-            except ValueError:
+            priority_lower = priority.lower().strip()
+            valid_priorities = ["critical", "high", "medium", "low"]
+            if priority_lower not in valid_priorities:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid priority: {priority}. Must be one of: critical, high, medium, low"
+                    detail=f"Invalid priority: '{priority}'. Must be one of: {', '.join(valid_priorities)}"
                 )
+            try:
+                update_data["priority"] = TaskPriority(priority_lower)
+            except ValueError as e:
+                logger.error(f"Error converting priority '{priority_lower}' to enum: {e}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid priority value: {priority}"
+                )
+        
         if status is not None:
-            try:
-                update_data["status"] = TaskStatus(status.lower())
-            except ValueError:
+            status_lower = status.lower().strip()
+            valid_statuses = ["pending", "in_progress", "completed", "cancelled"]
+            if status_lower not in valid_statuses:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid status: {status}. Must be one of: pending, in_progress, completed, cancelled"
+                    detail=f"Invalid status: '{status}'. Must be one of: {', '.join(valid_statuses)}"
+                )
+            try:
+                update_data["status"] = TaskStatus(status_lower)
+            except ValueError as e:
+                logger.error(f"Error converting status '{status_lower}' to enum: {e}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid status value: {status}"
                 )
         
+        # Check if there are any fields to update
         if not update_data:
-            raise HTTPException(status_code=400, detail="No fields to update")
+            raise HTTPException(status_code=400, detail="No valid fields provided to update")
         
-        updated_task = await TaskRepository.update(db, task_id, **update_data)
-        if not updated_task:
-            raise HTTPException(status_code=500, detail="Failed to update task")
-        
-        return _task_to_schema(updated_task)
+        # Perform the update
+        try:
+            updated_task = await TaskRepository.update(db, task_id, **update_data)
+            if not updated_task:
+                logger.error(f"TaskRepository.update returned None for task_id: {task_id}")
+                raise HTTPException(status_code=500, detail="Failed to update task. Update operation returned no result.")
+            
+            logger.info(f"Successfully updated task {task_id} with fields: {list(update_data.keys())}")
+            return _task_to_schema(updated_task)
+            
+        except Exception as db_error:
+            logger.error(f"Database error updating task {task_id}: {str(db_error)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error while updating task: {str(db_error)}"
+            )
         
     except HTTPException:
+        # Re-raise HTTP exceptions as-is
         raise
+    except ValueError as e:
+        # Handle value errors (e.g., enum conversion)
+        logger.error(f"Value error updating task {task_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid input value: {str(e)}"
+        )
     except Exception as e:
-        logger.error(f"Error updating task {task_id}: {str(e)}", exc_info=True)
+        # Catch-all for unexpected errors
+        logger.error(f"Unexpected error updating task {task_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Error updating task: {str(e)}"
+            detail=f"An unexpected error occurred while updating task: {str(e)}"
         )
 
 
@@ -150,11 +208,36 @@ async def delete_task(
     task_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a task"""
-    success = await TaskRepository.delete(db, task_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return {"message": "Task deleted successfully"}
+    """Delete a task with error handling"""
+    try:
+        # Validate task_id
+        if not task_id or not task_id.strip():
+            raise HTTPException(status_code=400, detail="Task ID cannot be empty")
+        
+        task_id = task_id.strip()
+        
+        # Check if task exists before attempting deletion
+        task = await TaskRepository.get_by_id(db, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+        
+        # Perform deletion
+        success = await TaskRepository.delete(db, task_id)
+        if not success:
+            logger.error(f"TaskRepository.delete returned False for task_id: {task_id}")
+            raise HTTPException(status_code=500, detail="Failed to delete task. Deletion operation failed.")
+        
+        logger.info(f"Successfully deleted task {task_id}")
+        return {"message": "Task deleted successfully", "task_id": task_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting task {task_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting task: {str(e)}"
+        )
 
 
 @router.post("/tasks/{task_id}/complete", response_model=TaskSchema)

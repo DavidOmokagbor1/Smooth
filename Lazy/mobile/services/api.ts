@@ -108,7 +108,7 @@ export async function processTextInput(
     
     const response = await axios.post<VoiceProcessingResponse>(
       API_ENDPOINTS.PROCESS_TEXT,
-      { text },
+      { text: text.trim() }, // Ensure text is trimmed
       {
         headers: {
           'Content-Type': 'application/json',

@@ -54,17 +54,22 @@ async def process_voice_input(
         # Save emotional state record
         if db:
             try:
+                # Truncate transcript if too long for database
+                transcript_text = response.transcript[:1000] if len(response.transcript) > 1000 else response.transcript
+                
                 await EmotionalStateRepository.create(
                     db=db,
                     primary_emotion=response.emotional_state.primary_emotion,
                     energy_level=response.emotional_state.energy_level,
                     stress_level=response.emotional_state.stress_level,
                     confidence=response.emotional_state.confidence,
-                    transcript_text=response.transcript,
+                    transcript_text=transcript_text,
                     task_count=len(response.tasks),
                 )
+                logger.debug(f"Saved emotional state record: {response.emotional_state.primary_emotion}")
             except Exception as e:
-                logger.warning(f"Failed to save emotional state record: {e}")
+                logger.warning(f"Failed to save emotional state record: {e}", exc_info=True)
+                # Don't fail the request if emotional state save fails
         
         # Save tasks to database
         if db:

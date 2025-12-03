@@ -49,6 +49,17 @@ export function TaskDetailModal({
   const [reminderTime, setReminderTime] = useState<Date | null>(null);
   const [reminderEnabled, setReminderEnabled] = useState(false);
 
+  // Update reminder state when task changes
+  useEffect(() => {
+    if (task?.reminder_time) {
+      setReminderTime(new Date(task.reminder_time));
+      setReminderEnabled(true);
+    } else {
+      setReminderTime(null);
+      setReminderEnabled(false);
+    }
+  }, [task]);
+
   if (!task) return null;
 
   const getPriorityConfig = (priority: string) => {
@@ -509,6 +520,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#EF4444',
+  },
+  fallbackPicker: {
+    padding: 16,
+    backgroundColor: '#1F2937',
+    borderRadius: 8,
+  },
+  fallbackText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
   },
 });
 

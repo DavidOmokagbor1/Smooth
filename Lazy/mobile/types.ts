@@ -15,11 +15,15 @@ export interface TaskCategory {
 export interface Task {
   id: string;
   title: string;
+  description?: string;
   priority: TaskPriority;
   category: TaskCategory;
   original_text: string;
   suggested_time?: string;
+  due_date?: string;
+  reminder_time?: string;
   location_coordinates?: Record<string, any>;
+  status?: TaskStatus;
 }
 
 export interface EmotionalState {

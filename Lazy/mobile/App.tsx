@@ -539,8 +539,12 @@ export default function App() {
         onDelete={handleTaskDelete}
         onUpdate={handleTaskUpdate}
         onSetReminder={async (taskId, reminderTime) => {
-          // Update task with reminder time
-          await handleTaskUpdate(taskId, { reminder_time: reminderTime.toISOString() });
+          try {
+            // Update task with reminder time
+            await handleTaskUpdate(taskId, { reminder_time: reminderTime.toISOString() });
+          } catch (error: any) {
+            console.error('Error setting reminder:', error);
+          }
         }}
       />
       {/* Route Plan Modal */}

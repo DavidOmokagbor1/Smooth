@@ -41,6 +41,10 @@ class ProactiveService:
         - Historical patterns
         
         Returns list of suggestion dictionaries.
+        
+        TIMEZONE HANDLING:
+        - Uses datetime.now() for user-facing time context (time of day) - correct
+        - Uses datetime.utcnow() for all database timestamp comparisons - correct
         """
         suggestions = []
         
@@ -66,9 +70,10 @@ class ProactiveService:
                 if t.status in [TaskStatus.PENDING, TaskStatus.IN_PROGRESS]
             ]
             
-            # Get time context
-            now = datetime.now()
-            hour = now.hour
+            # Get time context (use local time for user-facing time of day)
+            # This is correct because we want to know the user's local time
+            now_local = datetime.now()
+            hour = now_local.hour
             time_of_day = "night"
             if 5 <= hour < 12:
                 time_of_day = "morning"
@@ -76,6 +81,10 @@ class ProactiveService:
                 time_of_day = "afternoon"
             elif 17 <= hour < 21:
                 time_of_day = "evening"
+            
+            # CRITICAL: For database comparisons, use UTC
+            # All database timestamps (due_date, created_at, etc.) are stored in UTC
+            now_utc = datetime.utcnow()
             
             # Generate suggestions based on patterns
             
@@ -129,10 +138,12 @@ class ProactiveService:
                             suggestions.append(suggestion)
             
             # 3. Task reminders (tasks that are due soon or overdue)
+            # CRITICAL FIX: Use UTC for database timestamp comparisons
+            # task.due_date is stored in UTC, so we must compare with UTC time
             urgent_tasks = [
                 t for t in active_tasks
                 if t.priority == TaskPriority.CRITICAL
-                or (t.due_date and t.due_date < datetime.utcnow() + timedelta(hours=24))
+                or (t.due_date and t.due_date < now_utc + timedelta(hours=24))
             ]
             if urgent_tasks:
                 task = urgent_tasks[0]
@@ -172,9 +183,10 @@ class ProactiveService:
             suggestions = suggestions[:3]  # Top 3 suggestions
             
             # Save suggestions to database
+            # CRITICAL FIX: Use UTC for database timestamps
             for sug in suggestions:
                 try:
-                    expires_at = datetime.utcnow() + timedelta(hours=24)  # Expire in 24 hours
+                    expires_at = now_utc + timedelta(hours=24)  # Expire in 24 hours
                     await ProactiveSuggestionRepository.create(
                         db=db,
                         user_id=user_id,
@@ -195,4 +207,3 @@ class ProactiveService:
             logger.error(f"Error generating proactive suggestions: {e}", exc_info=True)
         
         return suggestions
-

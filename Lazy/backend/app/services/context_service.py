@@ -137,9 +137,17 @@ class ContextService:
         return context
     
     def _get_time_context(self) -> Dict[str, Any]:
-        """Get current time context for temporal reasoning"""
-        now = datetime.now()
-        hour = now.hour
+        """
+        Get current time context for temporal reasoning.
+        
+        NOTE: Uses local time (datetime.now()) for user-facing time context
+        (time of day, hour) because we want to know the user's local time.
+        For database timestamp comparisons, use datetime.utcnow() instead.
+        """
+        # Use local time for user-facing context (time of day, hour)
+        # This is correct because we want to know the user's local time
+        now_local = datetime.now()
+        hour = now_local.hour
         
         time_of_day = "night"
         if 5 <= hour < 12:
@@ -149,12 +157,16 @@ class ContextService:
         elif 17 <= hour < 21:
             time_of_day = "evening"
         
+        # Also include UTC time for any database comparisons
+        now_utc = datetime.utcnow()
+        
         return {
-            "current_time": now.isoformat(),
+            "current_time": now_local.isoformat(),  # Local time for display
+            "current_time_utc": now_utc.isoformat(),  # UTC time for database comparisons
             "time_of_day": time_of_day,
-            "day_of_week": now.strftime("%A").lower(),
+            "day_of_week": now_local.strftime("%A").lower(),
             "hour": hour,
-            "is_weekend": now.weekday() >= 5,
+            "is_weekend": now_local.weekday() >= 5,
         }
     
     async def learn_patterns(

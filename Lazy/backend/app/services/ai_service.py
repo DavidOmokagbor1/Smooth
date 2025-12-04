@@ -9,6 +9,8 @@ import json
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 
+logger = logging.getLogger(__name__)
+
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
@@ -25,8 +27,6 @@ from app.models.schemas import (
     TaskPriority
 )
 from app.core.config import settings
-
-logger = logging.getLogger(__name__)
 
 
 class AIService:

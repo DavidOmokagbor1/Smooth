@@ -63,13 +63,12 @@ async def get_db() -> AsyncSession:
     if async_session_maker is None:
         # Return None instead of raising - allows graceful degradation
         yield None
-        return
-    
-    async with async_session_maker() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+    else:
+        async with async_session_maker() as session:
+            try:
+                yield session
+            finally:
+                await session.close()
 
 
 async def close_db():

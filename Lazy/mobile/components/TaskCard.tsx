@@ -60,7 +60,6 @@ export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCa
           pressed && styles.cardPressed
         ]}
         onPress={() => {
-          console.log('TaskCard pressed:', task.id);
           onPress?.(task);
         }}
       >
@@ -111,7 +110,6 @@ export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCa
           <TouchableOpacity
             style={styles.completeButton}
             onPress={() => {
-              console.log('Complete button pressed');
               onComplete?.(task.id);
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -127,7 +125,6 @@ export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCa
               <TouchableOpacity
                 style={styles.quickActionButton}
                 onPress={() => {
-                  console.log('Edit button pressed');
                   Alert.prompt(
                     'Edit Task',
                     'Enter new task title:',
@@ -155,7 +152,6 @@ export function TaskCard({ task, onComplete, onDelete, onEdit, onPress }: TaskCa
               <TouchableOpacity
                 style={styles.quickActionButton}
                 onPress={() => {
-                  console.log('Delete button pressed');
                   onDelete?.(task.id);
                 }}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
